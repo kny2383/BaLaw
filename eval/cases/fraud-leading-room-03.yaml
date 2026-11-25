@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-leading-room-03
+group: fraud-leading-room
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 주식 리딩방 사기요.. 유튜브 보고 들어갔는데 vip방 들어가려면 가입비 내라고 해서 300 냈고 그다음에 종목 추천받아서 따로 투자금 넣으라해서 또 넣고 ㅠ 총 2천 좀 넘게 날렸어요
+pii:
+  names:
+  - 나리딩
+  phones:
+  - 010-9090-8080
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 9월 중순부터 10월 초까지요 정확한 날짜는 이체내역 보면 알아요
+  channel_or_place:
+    in_narrative: true
+    answer: 유튜브 보고 카톡방이요
+  method:
+    in_narrative: false
+    answer: 계좌이체요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 팀장이라는 나리딩이요 그사람 계좌로 보냈어요
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 가입비 300 투자금 1800 해서 2100이요
+  quote:
+    in_narrative: false
+    answer: vip는 세력주 정보 미리 준다 손실나면 100% 보상해준다고 했어요
+  who:
+    in_narrative: false
+    answer: 나리딩 팀장 010-9090-8080
+  what_action:
+    in_narrative: true
+    answer: 가입비랑 투자금 보낸거요
+  to_whom:
+    in_narrative: false
+    answer: 나리딩 명의 계좌요
+  timeline:
+    in_narrative: false
+    answer: 9월 15일쯤 가입비 9월 말 투자금 10월 초에 연락두절
+  why_believed:
+    in_narrative: false
+    answer: 유튜브 구독자가 많아서요
+  proof:
+    in_narrative: false
+    answer: 카톡이랑 이체내역 있어요

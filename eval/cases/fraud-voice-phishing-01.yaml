@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-voice-phishing-01
+group: fraud-voice-phishing
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 서울중앙지검 수사관이라는 사람에게 전화가 와서 제 명의 계좌가 범죄에 쓰였다며 자산 보호를 위해 돈을 안전계좌로 옮기라고 했습니다. 2026년 10월 21일 시키는 대로 1,500만원을 이체했습니다.
+pii:
+  names:
+  - 가짜수사
+  phones:
+  - 02-000-0000
+  accounts:
+  - 987-654-321000
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 10월 21일 오후 1시쯤입니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 전화입니다. 중간에 가짜 검찰청 사이트 주소도 문자로 받았습니다.
+  method:
+    in_narrative: true
+    answer: 인터넷뱅킹 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 자신을 서울중앙지검 가짜수사 수사관이라고 했습니다. 안전계좌 예금주는 다른 개인 이름이었습니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 1,500만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"지금 협조하지 않으면 공범으로 구속될 수 있다, 이 계좌는 금융감독원 보호계좌"라고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 검찰 수사관을 사칭한 가짜수사, 발신번호 02-000-0000입니다.
+  what_action:
+    in_narrative: true
+    answer: 1,500만원을 이체했습니다.
+  to_whom:
+    in_narrative: false
+    answer: 상대가 불러 준 계좌 987-654-321000입니다.
+  timeline:
+    in_narrative: false
+    answer: 12시 반쯤 전화, 1시에 이체, 3시에 은행에 전화해 보니 사기라고 해서 지급정지를 신청했습니다.
+  why_believed:
+    in_narrative: false
+    answer: 제 이름과 주민번호 앞자리를 알고 있었고 검찰청 사이트처럼 보이는 화면을 보여 줬습니다.
+  proof:
+    in_narrative: false
+    answer: 통화 기록, 문자, 이체 내역, 지급정지 접수증이 있습니다.

@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-used-goods-03
+group: fraud-used-goods
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 번개장터에서 에어팟 프로 산다고 돈보냇는데 안옴.. 판매자가 계속 내일보낸다 내일보낸다 하다가 이제 아예 읽씹해요 ㅠㅠ 18만원이나 보냈는데 어떡해요 경찰서가야되나요
+pii:
+  names:
+  - 이가짜
+  phones:
+  - 010-2222-3333
+  accounts:
+  - 3333-01-2345678
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 음 11월 초였던거같은데 11월 4일? 저녁쯤이요
+  channel_or_place:
+    in_narrative: true
+    answer: 번개장터요
+  method:
+    in_narrative: false
+    answer: 카카오뱅크로 이체했어요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 닉네임 애플매니아고 예금주 이가짜요. 카뱅 3333-01-2345678
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 18만원이요
+  quote:
+    in_narrative: false
+    answer: 정품이고 박스 그대로 있다고 오늘 편의점택배로 보낸다고 했어요
+  who:
+    in_narrative: false
+    answer: 번장 판매자요 닉네임 애플매니아. 번호는 010-2222-3333 받았었어요
+  what_action:
+    in_narrative: true
+    answer: 18만원 보낸거요
+  to_whom:
+    in_narrative: false
+    answer: 판매자 계좌요 예금주 이가짜
+  timeline:
+    in_narrative: false
+    answer: 4일에 보내고 5일 6일 계속 내일 보낸다고 하다가 7일부터 답장 안해요
+  why_believed:
+    in_narrative: false
+    answer: 후기가 몇개 있었어서요
+  proof:
+    in_narrative: false
+    answer: 캡쳐 있어요 이체내역도 있고

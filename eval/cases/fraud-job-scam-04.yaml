@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-job-scam-04
+group: fraud-job-scam
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 채용 면접을 본 회사에서 입사 전 교육비와 자격증 발급비가 필요하다며 150만원을 요구했습니다. 2026년 2월 2일 송금했으나 입사일 직전 회사가 채용을 취소하고 환불도 해 주지 않습니다.
+pii:
+  names:
+  - 백교육
+  phones:
+  - 010-3030-4040
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 2월 2일입니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 회사 사무실에서 면접을 봤고 이후 전화로 안내받았습니다.
+  method:
+    in_narrative: true
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 회사 이름 가상아카데미, 인사담당 백교육입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 150만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"교육 수료하면 바로 정규직이고 교육비는 3개월 뒤 월급에 포함해 돌려준다"고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 가상아카데미 인사담당 백교육, 010-3030-4040입니다.
+  what_action:
+    in_narrative: true
+    answer: 교육비 150만원을 송금했습니다.
+  to_whom:
+    in_narrative: false
+    answer: 가상아카데미 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 1월 말 면접, 2월 2일 송금, 2월 25일 채용 취소 통보, 이후 환불 요청을 무시합니다.
+  why_believed:
+    in_narrative: false
+    answer: 실제 사무실에서 면접을 봤습니다.
+  proof:
+    in_narrative: false
+    answer: 문자와 이체 내역이 있습니다.

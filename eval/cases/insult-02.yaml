@@ -1,0 +1,39 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: insult-02
+group: insult
+split: dev
+author: claude
+style: 정돈
+offense_selected: 모욕
+expected_offense: insult
+gold_crime_label: 모욕
+run_conversation: true
+narrative: 온라인 게임 전체 채팅에서 상대 플레이어가 제 닉네임을 언급하며 반복적으로 성적인 욕설을 했습니다. 당시 같은 서버 접속자는 수백 명이었습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 9월 3일 저녁 9시부터 30분 정도입니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 온라인 게임 전체 채팅입니다.
+  accused_info:
+    in_narrative: false
+    answer: 게임 닉네임 DarkLord99입니다.
+  audience_scope:
+    in_narrative: true
+    answer: 같은 서버 접속자 수백 명이 볼 수 있었습니다.
+  how_identified:
+    in_narrative: false
+    answer: 제 게임 닉네임을 직접 적었고, 길드원들은 제 실명도 압니다.
+  quote:
+    in_narrative: false
+    answer: 차마 그대로 쓰기 어려운 성적인 욕설이었습니다. 캡처는 있습니다.
+  target:
+    in_narrative: true
+    answer: 제 닉네임을 언급했습니다.
+notes: 결정 0001에 따른 보류 판단용 사례

@@ -1,0 +1,54 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: sparse-05
+group: sparse
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 전화로 사기당함
+pii:
+  names: []
+  phones:
+  - 010-5050-6060
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 11월 20일 오후
+  channel_or_place:
+    in_narrative: false
+    answer: 전화요
+  method:
+    in_narrative: false
+    answer: 계좌이체
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 경찰이라는 사람이요
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 300만원
+  quote:
+    in_narrative: false
+    answer: 제 계좌가 범죄에 연루됐다고
+  who:
+    in_narrative: false
+    answer: 경찰 사칭한 사람 010-5050-6060
+  what_action:
+    in_narrative: false
+    answer: 300 보냄
+  to_whom:
+    in_narrative: false
+    answer: 불러준 계좌
+  timeline:
+    in_narrative: false
+    answer: 전화받고 30분만에 보냄
+  why_believed:
+    in_narrative: false
+    answer: 무서워서요
+  proof:
+    in_narrative: false
+    answer: 통화기록이요

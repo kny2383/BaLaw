@@ -1,50 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
 id: fraud-used-goods-01
 group: fraud-used-goods
 split: dev
 author: claude
-
+style: 정돈
 offense_selected: 사기
 expected_offense: fraud
 gold_crime_label: 사기
-
-narrative: >-
-  2026년 11월 10일 저녁 8시쯤 중고나라에서 아이폰 15 미개봉 새 상품을 사려고 했어요.
-  판매자 닉네임은 폰팔이77이었고 국민은행 계좌로 50만원을 보냈는데
-  택배로 보내준다더니 물건은 안 오고 카톡도 차단당했어요. 너무 억울합니다.
-
+run_conversation: true
+narrative: 2026년 11월 10일 저녁 8시쯤 중고나라에서 아이폰 15 미개봉 새 상품을 사려고 했어요. 판매자 닉네임은 폰팔이77이었고 국민은행 계좌로 50만원을 보냈는데 택배로 보내준다더니 물건은 안 오고 카톡도 차단당했어요. 너무 억울합니다.
 pii:
-  names: ["김가상"]
-  phones: ["010-1234-5678"]
-  accounts: ["123456-01-000000"]
+  names:
+  - 김가상
+  phones:
+  - 010-1234-5678
+  accounts:
+  - 123456-01-000000
   addresses: []
-
 slots:
-  date:                        {in_narrative: true,  answer: "2026년 11월 10일 저녁 8시쯤이요."}
-  channel_or_place:            {in_narrative: true,  answer: "중고나라 앱이에요."}
-  method:                      {in_narrative: true,  answer: "계좌이체로 보냈어요."}
-  recipient_name_or_handle:    {in_narrative: true,  answer: "닉네임은 폰팔이77이고 예금주는 김가상이었어요. 계좌번호는 국민은행 123456-01-000000이에요."}
-  amount_numeric_or_item_value: {in_narrative: true,  answer: "50만원이요."}
-  quote:                       {in_narrative: false, answer: "\"정품 미개봉이고 오늘 바로 택배로 보낸다\"고 했어요."}
-  who:                         {in_narrative: true,  answer: "닉네임 폰팔이77인 판매자예요. 연락처는 010-1234-5678이었어요."}
-  what_action:                 {in_narrative: true,  answer: "제가 직접 50만원을 계좌이체했어요."}
-  to_whom:                     {in_narrative: true,  answer: "판매자가 알려준 국민은행 계좌, 예금주 김가상이요."}
-  timeline:                    {in_narrative: false, answer: "11월 10일 저녁 8시에 대화하고 8시 20분쯤 송금했어요. 다음 날부터 연락이 안 됐어요."}
-  why_believed:                {in_narrative: false, answer: "판매글에 제품 사진이 있었고 미개봉이라고 해서 믿었어요."}
-  proof:                       {in_narrative: false, answer: "카톡 대화 캡처랑 이체 내역은 있어요."}
-
-allowed_facts:
-  - "2026년 11월 10일 저녁 8시경"
-  - "중고나라"
-  - "아이폰 15 미개봉 새 상품"
-  - "닉네임 폰팔이77"
-  - "국민은행 계좌, 예금주 김가상, 123456-01-000000"
-  - "50만원 계좌이체"
-  - "택배로 보내주겠다고 함"
-  - "\"정품 미개봉이고 오늘 바로 택배로 보낸다\"는 말"
-  - "물건 미수령"
-  - "카톡 차단, 다음 날부터 연락 두절"
-  - "판매글의 제품 사진"
-  - "카톡 대화 캡처와 이체 내역 보유"
-  - "연락처 010-1234-5678"
-
-notes: "기획 문서 시나리오 5종 중 중고마켓 사기. 서술에 대부분의 사실이 있어 질문이 적어야 하는 쉬운 사례."
+  date:
+    in_narrative: true
+    answer: 2026년 11월 10일 저녁 8시쯤이요.
+  channel_or_place:
+    in_narrative: true
+    answer: 중고나라 앱이에요.
+  method:
+    in_narrative: true
+    answer: 계좌이체로 보냈어요.
+  recipient_name_or_handle:
+    in_narrative: true
+    answer: 닉네임은 폰팔이77이고 예금주는 김가상이었어요. 계좌번호는 국민은행 123456-01-000000이에요.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 50만원이요.
+  quote:
+    in_narrative: false
+    answer: '"정품 미개봉이고 오늘 바로 택배로 보낸다"고 했어요.'
+  who:
+    in_narrative: true
+    answer: 닉네임 폰팔이77인 판매자예요. 연락처는 010-1234-5678이었어요.
+  what_action:
+    in_narrative: true
+    answer: 제가 직접 50만원을 계좌이체했어요.
+  to_whom:
+    in_narrative: true
+    answer: 판매자가 알려준 국민은행 계좌, 예금주 김가상이요.
+  timeline:
+    in_narrative: false
+    answer: 11월 10일 저녁 8시에 대화하고 8시 20분쯤 송금했어요. 다음 날부터 연락이 안 됐어요.
+  why_believed:
+    in_narrative: false
+    answer: 판매글에 제품 사진이 있었고 미개봉이라고 해서 믿었어요.
+  proof:
+    in_narrative: false
+    answer: 카톡 대화 캡처랑 이체 내역은 있어요.

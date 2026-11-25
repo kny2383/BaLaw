@@ -1,0 +1,40 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: insult-03
+group: insult
+split: dev
+author: claude
+style: 구어체
+offense_selected: 모욕
+expected_offense: insult
+gold_crime_label: 모욕
+run_conversation: true
+narrative: 회사 회의시간에 팀장이 다른 팀원들 다 있는데서 저한테 병신같은게 일을 이따위로 하냐고 소리질렀어요 이거 모욕죄 되나요
+pii:
+  names:
+  - 구팀장
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 11월 18일 오전 10시 회의요
+  channel_or_place:
+    in_narrative: true
+    answer: 회사 회의실이요
+  accused_info:
+    in_narrative: false
+    answer: 팀장 구팀장이요
+  audience_scope:
+    in_narrative: true
+    answer: 팀원 7명 있었어요
+  how_identified:
+    in_narrative: true
+    answer: 저한테 직접 말한거라 다 알아요
+  quote:
+    in_narrative: true
+    answer: 병신같은게 일을 이따위로 하냐
+  target:
+    in_narrative: true
+    answer: 저요
+notes: 결정 0001에 따른 보류 판단용 사례

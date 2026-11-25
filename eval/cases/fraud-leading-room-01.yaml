@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-leading-room-01
+group: fraud-leading-room
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 텔레그램 주식 리딩방에서 '수익 보장 공모주'에 투자하라는 권유를 받고 2026년 6월부터 세 번에 걸쳐 총 3천만원을 보냈습니다. 앱에는 수익이 났다고 나오는데 출금하려니 수수료를 더 내라고 합니다.
+pii:
+  names:
+  - 가상투자
+  phones: []
+  accounts:
+  - 090-00-123456
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 6월 3일, 6월 10일, 6월 24일에 보냈습니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 텔레그램 리딩방과 그들이 깔게 한 투자 앱입니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 리딩방 운영자 '김대표'라는 닉네임이고, 입금 계좌 예금주는 주식회사 가상투자였습니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 총 3천만원입니다. 1천만원씩 세 번입니다.
+  quote:
+    in_narrative: false
+    answer: '"기관 배정 공모주라 원금 보장에 최소 30% 수익"이라고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 텔레그램 닉네임 김대표와 상담원 닉네임 지은매니저입니다.
+  what_action:
+    in_narrative: true
+    answer: 세 번에 걸쳐 3천만원을 입금했습니다.
+  to_whom:
+    in_narrative: false
+    answer: 주식회사 가상투자 명의 계좌 090-00-123456입니다.
+  timeline:
+    in_narrative: false
+    answer: 5월 말 리딩방 초대, 6월 세 번 입금, 7월 출금 신청했더니 수수료 500만원을 더 내라고 해서 사기인 걸 알았습니다.
+  why_believed:
+    in_narrative: false
+    answer: 처음 소액은 실제로 출금이 돼서 믿었습니다.
+  proof:
+    in_narrative: false
+    answer: 텔레그램 대화 캡처, 앱 화면, 이체 내역이 있습니다.

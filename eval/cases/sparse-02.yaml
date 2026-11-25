@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: sparse-02
+group: sparse
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 물건값을 먼저 보냈는데 물건이 오지 않습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 10월 30일입니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 중고나라입니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 닉네임 골프왕입니다.
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 골프채 세트 35만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"내일 택배로 보낸다"고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 닉네임 골프왕입니다.
+  what_action:
+    in_narrative: false
+    answer: 35만원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 판매자 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 30일 입금, 그 뒤 연락 두절입니다.
+  why_believed:
+    in_narrative: false
+    answer: 물건 사진을 여러 장 보내 줬습니다.
+  proof:
+    in_narrative: false
+    answer: 채팅 캡처가 있습니다.

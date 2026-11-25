@@ -1,0 +1,17 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: unsupported-defamation-01
+group: unsupported
+split: dev
+author: claude
+style: 정돈
+offense_selected: 명예훼손
+expected_offense: unsupported
+gold_crime_label: 명예훼손
+run_conversation: false
+narrative: 전 직장 동료가 업계 사람들이 있는 단체방에 제가 회사 돈을 빼돌려 잘렸다는 거짓말을 퍼뜨렸습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+notes: 대화는 진행하지 않고 대화 시작 응답의 죄목 처리(M5)와 판례 키워드(M4)만 본다

@@ -1,0 +1,39 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: insult-06
+group: insult
+split: holdout
+author: claude
+style: 구어체
+offense_selected: 모욕
+expected_offense: insult
+gold_crime_label: 모욕
+run_conversation: true
+narrative: 아파트 단톡방에서 누가 저보고 미친X이라고함 층간소음 얘기하다가
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 어제 저녁이요 11월 24일
+  channel_or_place:
+    in_narrative: true
+    answer: 아파트 입주민 단톡방이요
+  accused_info:
+    in_narrative: false
+    answer: 1203호 사는 사람이요 이름은 몰라요
+  audience_scope:
+    in_narrative: false
+    answer: 150명 정도 있어요
+  how_identified:
+    in_narrative: false
+    answer: 제 동호수를 말하면서 그랬어요
+  quote:
+    in_narrative: true
+    answer: 미친X
+  target:
+    in_narrative: false
+    answer: 제 동호수 언급했으니까 저죠
+notes: 결정 0001에 따른 보류 판단용 사례

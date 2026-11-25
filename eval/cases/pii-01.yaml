@@ -1,0 +1,57 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: pii-01
+group: pii
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 판매자 장거짓(010-8888-1234)에게 하나은행 555-910001-23456 계좌로 노트북 대금 95만원을 보냈습니다. 판매자 주소는 부산광역시 가상구 해변로 21이라고 했습니다. 2026년 11월 1일 중고나라 거래였고 물건은 오지 않았습니다.
+pii:
+  names:
+  - 장거짓
+  phones:
+  - 010-8888-1234
+  accounts:
+  - 555-910001-23456
+  addresses:
+  - 부산광역시 가상구 해변로 21
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 11월 1일입니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 중고나라입니다.
+  method:
+    in_narrative: true
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: true
+    answer: 장거짓, 하나은행 555-910001-23456입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 95만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"오늘 퀵으로 보낸다"고 했습니다.'
+  who:
+    in_narrative: true
+    answer: 장거짓, 010-8888-1234입니다.
+  what_action:
+    in_narrative: true
+    answer: 95만원을 보냈습니다.
+  to_whom:
+    in_narrative: true
+    answer: 장거짓 명의 하나은행 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 1일 송금 후 연락 두절입니다.
+  why_believed:
+    in_narrative: false
+    answer: 주소와 이름을 먼저 알려 줘서 믿었습니다.
+  proof:
+    in_narrative: false
+    answer: 문자와 이체 내역이 있습니다.

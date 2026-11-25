@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: vague-01
+group: vague
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 중고 거래로 자전거를 사려고 40만원을 보냈는데 판매자가 잠수를 탔습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 기억이 잘 안 나요. 여름이었던 것 같아요.
+  channel_or_place:
+    in_narrative: false
+    answer: 당근마켓이었나 번개장터였나 헷갈려요.
+  method:
+    in_narrative: false
+    answer: 계좌이체요.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 닉네임이 기억 안 나요.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 40만원이요.
+  quote:
+    in_narrative: false
+    answer: 정확히 뭐라고 했는지는 모르겠어요.
+  who:
+    in_narrative: false
+    answer: 판매자요. 그 이상은 몰라요.
+  what_action:
+    in_narrative: true
+    answer: 40만원 보냈어요.
+  to_whom:
+    in_narrative: false
+    answer: 판매자 계좌인데 예금주는 기억이 안 나요.
+  timeline:
+    in_narrative: false
+    answer: 보내고 며칠 뒤부터 연락이 안 됐어요.
+  why_believed:
+    in_narrative: false
+    answer: 그냥 별생각 없이 믿었어요.
+  proof:
+    in_narrative: false
+    answer: 대화방이 사라져서 증거가 없어요.

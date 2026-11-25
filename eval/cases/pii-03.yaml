@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: pii-03
+group: pii
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 보이스피싱 조직원 차수거(010-2468-1357)에게 2026년 10월 14일 서울 가상구 가상역 2번 출구에서 현금 800만원을 건넸습니다. 그는 신한은행 직원이라고 했습니다.
+pii:
+  names:
+  - 차수거
+  phones:
+  - 010-2468-1357
+  accounts: []
+  addresses:
+  - 서울 가상구 가상역 2번 출구
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 10월 14일 오후 2시입니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 가상역 2번 출구입니다.
+  method:
+    in_narrative: true
+    answer: 현금 전달입니다.
+  recipient_name_or_handle:
+    in_narrative: true
+    answer: 차수거입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 800만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"기존 대출을 현금으로 갚아야 저금리 대출이 나간다"고 했습니다.'
+  who:
+    in_narrative: true
+    answer: 은행 직원을 사칭한 차수거입니다.
+  what_action:
+    in_narrative: true
+    answer: 현금 800만원을 건넸습니다.
+  to_whom:
+    in_narrative: true
+    answer: 차수거에게 직접 건넸습니다.
+  timeline:
+    in_narrative: false
+    answer: 12일 전화, 14일 현금 전달, 15일 은행에서 사기임을 확인했습니다.
+  why_believed:
+    in_narrative: false
+    answer: 제 대출 정보를 알고 있었습니다.
+  proof:
+    in_narrative: false
+    answer: 통화 기록이 있습니다.

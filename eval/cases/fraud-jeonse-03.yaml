@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-jeonse-03
+group: fraud-jeonse
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 전세사기 당한거같아요 집주인이 보증금 안돌려줌. 2년 살았고 1억5천인데 만기된지 4달 됐어요 연락하면 기다려라 이말만해요 경매넘어간다는 얘기도 들리고 진짜 미치겠어요
+pii:
+  names:
+  - 오대납
+  phones:
+  - 010-7777-8888
+  accounts: []
+  addresses:
+  - 인천광역시 가상구 가상길 7
+slots:
+  date:
+    in_narrative: false
+    answer: 계약은 2024년 7월쯤이요 만기는 2026년 7월
+  channel_or_place:
+    in_narrative: false
+    answer: 인천 가상구 가상길 7 빌라요
+  method:
+    in_narrative: false
+    answer: 계좌로 보냈어요 대출이랑 제돈 합쳐서
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 집주인 오대납이요
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 1억5천이요
+  quote:
+    in_narrative: false
+    answer: 계약할때 보증보험 걱정 안해도 된다 돈은 바로 돌려준다 그랬어요
+  who:
+    in_narrative: false
+    answer: 집주인 오대납 010-7777-8888
+  what_action:
+    in_narrative: false
+    answer: 보증금 보낸거요
+  to_whom:
+    in_narrative: false
+    answer: 집주인 계좌요
+  timeline:
+    in_narrative: false
+    answer: 24년 7월 계약 26년 7월 만기 그뒤로 계속 기다리라고만 함 11월인 지금까지 못받음
+  why_believed:
+    in_narrative: false
+    answer: 중개사도 괜찮다고 했고 집주인이 친절했어요
+  proof:
+    in_narrative: false
+    answer: 계약서랑 문자 있어요

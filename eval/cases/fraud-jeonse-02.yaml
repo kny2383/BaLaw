@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-jeonse-02
+group: fraud-jeonse
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 오피스텔 전세 계약을 하면서 집주인이 근저당이 없다고 했는데, 계약 직후 확인해 보니 계약 전날 집주인이 은행 대출을 받아 근저당이 설정돼 있었습니다. 보증금 2억원을 이미 보낸 상태입니다.
+pii:
+  names:
+  - 한속임
+  phones: []
+  accounts: []
+  addresses:
+  - 경기도 가상시 가상동 45, 1105호
+slots:
+  date:
+    in_narrative: false
+    answer: 2025년 11월 1일에 계약하고 잔금을 보냈습니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 경기도 가상시 가상동 45 오피스텔 1105호입니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 집주인 한속임입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 2억원입니다.
+  quote:
+    in_narrative: true
+    answer: '"근저당 하나도 없는 깨끗한 집"이라고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 집주인 한속임입니다.
+  what_action:
+    in_narrative: true
+    answer: 보증금 2억원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 집주인 명의 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 10월 31일 근저당 설정, 11월 1일 계약과 잔금, 11월 3일 등기부등본을 다시 떼 보고 알았습니다.
+  why_believed:
+    in_narrative: false
+    answer: 계약 일주일 전에 본 등기부등본에는 근저당이 없었습니다.
+  proof:
+    in_narrative: false
+    answer: 계약서, 계약 전후 등기부등본 두 개, 이체 내역이 있습니다.

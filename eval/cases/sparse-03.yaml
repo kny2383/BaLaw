@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: sparse-03
+group: sparse
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 투자하라고 해서 했는데 돈을 못돌려받고있어요
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 올해 5월이요
+  channel_or_place:
+    in_narrative: false
+    answer: 아는 형이 소개한 카톡방이요
+  method:
+    in_narrative: false
+    answer: 계좌이체요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 카톡방 방장 닉네임 투자왕이요
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 500만원이요
+  quote:
+    in_narrative: false
+    answer: 한달에 10% 수익 확정이라고 했어요
+  who:
+    in_narrative: false
+    answer: 방장 투자왕이요
+  what_action:
+    in_narrative: false
+    answer: 500 넣었어요
+  to_whom:
+    in_narrative: false
+    answer: 방장이 알려준 계좌요
+  timeline:
+    in_narrative: false
+    answer: 5월에 넣고 8월부터 출금이 안돼요
+  why_believed:
+    in_narrative: false
+    answer: 아는 형이 소개해서요
+  proof:
+    in_narrative: false
+    answer: 카톡 있어요

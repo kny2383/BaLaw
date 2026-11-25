@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-jeonse-04
+group: fraud-jeonse
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 집주인이 아닌 사람이 자신을 집주인이라고 속여 전세 계약을 했습니다. 2026년 5월 보증금 9천만원을 그 사람 계좌로 보냈는데, 실제 소유자가 나타나 계약이 무효라고 합니다.
+pii:
+  names:
+  - 유사칭
+  phones:
+  - 010-1212-3434
+  accounts:
+  - 302-0000-5555-11
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 5월 12일입니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 부동산 앱 직거래 게시글을 보고 연락했고, 집 앞에서 계약서를 썼습니다.
+  method:
+    in_narrative: true
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 자신을 집주인이라고 한 유사칭입니다. 농협 302-0000-5555-11 계좌입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 9천만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"제가 이 집 주인이고 부모님께 증여받았다"며 신분증 사본을 보여 줬습니다.'
+  who:
+    in_narrative: false
+    answer: 유사칭, 연락처 010-1212-3434입니다. 지금은 연락이 안 됩니다.
+  what_action:
+    in_narrative: true
+    answer: 보증금 9천만원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 유사칭 명의 농협 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 5월 10일 집 확인, 12일 계약과 송금, 6월 1일 실제 소유자가 찾아와 알게 됐습니다.
+  why_believed:
+    in_narrative: false
+    answer: 신분증 사본과 위조된 등기권리증을 보여 줬습니다.
+  proof:
+    in_narrative: false
+    answer: 계약서, 신분증 사본 사진, 이체 내역이 있습니다.

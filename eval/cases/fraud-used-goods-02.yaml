@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-used-goods-02
+group: fraud-used-goods
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 당근마켓에서 닌텐도 스위치 OLED를 28만원에 사기로 하고, 판매자가 직거래가 어렵다며 택배 거래를 하자고 해서 2026년 10월 3일 오후 2시쯤 신한은행 계좌로 돈을 보냈습니다. 그 뒤로 판매자가 채팅에 답이 없고 계정도 탈퇴했습니다.
+pii:
+  names:
+  - 박가명
+  phones: []
+  accounts:
+  - 110-000-111111
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 10월 3일 오후 2시쯤이에요.
+  channel_or_place:
+    in_narrative: true
+    answer: 당근마켓 채팅이요.
+  method:
+    in_narrative: true
+    answer: 계좌이체요.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 닉네임은 겜돌이였고 예금주는 박가명이에요. 신한은행 110-000-111111이요.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 28만원이요.
+  quote:
+    in_narrative: false
+    answer: '"직거래는 지방이라 어렵고 입금 확인되면 바로 택배 보낼게요"라고 했어요.'
+  who:
+    in_narrative: false
+    answer: 당근마켓 닉네임 겜돌이예요. 실명은 예금주 이름밖에 몰라요.
+  what_action:
+    in_narrative: true
+    answer: 28만원을 계좌로 보냈어요.
+  to_whom:
+    in_narrative: false
+    answer: 판매자가 알려준 신한은행 계좌, 예금주 박가명이요.
+  timeline:
+    in_narrative: false
+    answer: 10월 3일 1시쯤 채팅하고 2시에 입금했는데 그날 저녁부터 답이 없었고 다음 날 탈퇴했어요.
+  why_believed:
+    in_narrative: false
+    answer: 매너온도가 40도가 넘어서 믿을 만하다고 생각했어요.
+  proof:
+    in_narrative: false
+    answer: 채팅 캡처랑 이체 확인증 있어요.

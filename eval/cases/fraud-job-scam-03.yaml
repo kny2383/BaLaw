@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-job-scam-03
+group: fraud-job-scam
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 알바몬에서 블로그 리뷰 알바한다고 했는데 처음엔 돈 주더니 나중에 미션 금액 크게 넣어야 정산된다해서 넣었더니 안돌려줘요 총 80만원정도요
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 10월 말쯤이요 28일? 29일?
+  channel_or_place:
+    in_narrative: true
+    answer: 알바몬 보고 텔레그램으로 연락했어요
+  method:
+    in_narrative: false
+    answer: 계좌이체요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 텔레그램 닉네임 리뷰팀장이요
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 80만원 정도요 30 50 두번
+  quote:
+    in_narrative: false
+    answer: 미션 완료하면 원금이랑 수수료 30% 같이 준다고했어요
+  who:
+    in_narrative: false
+    answer: 텔레그램 리뷰팀장이요 다른건 몰라요
+  what_action:
+    in_narrative: true
+    answer: 미션금액 넣은거요
+  to_whom:
+    in_narrative: false
+    answer: 그쪽에서 알려준 계좌 매번 달랐어요
+  timeline:
+    in_narrative: false
+    answer: 처음에 만원 넣으니 만3천원 돌려줘서 믿었고 그다음 30 넣고 50 넣었는데 그뒤로 안줌
+  why_believed:
+    in_narrative: false
+    answer: 처음에 진짜 돈을 돌려줬어서요
+  proof:
+    in_narrative: false
+    answer: 텔레그램 캡쳐 있어요

@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: pii-05
+group: pii
+split: holdout
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 알바 사기요 담당자 탁채용 010-1357-2468 이 사람한테 기업은행 012-345678-01-011 으로 보증금 30 보냈어요 9월 5일에요
+pii:
+  names:
+  - 탁채용
+  phones:
+  - 010-1357-2468
+  accounts:
+  - 012-345678-01-011
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 9월 5일이요
+  channel_or_place:
+    in_narrative: false
+    answer: 잡코리아 보고 카톡이요
+  method:
+    in_narrative: true
+    answer: 계좌이체요
+  recipient_name_or_handle:
+    in_narrative: true
+    answer: 탁채용 기업은행 012-345678-01-011
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 30만원이요
+  quote:
+    in_narrative: false
+    answer: 장비 보증금 내면 다음주부터 재택근무 시작이라고 했어요
+  who:
+    in_narrative: true
+    answer: 담당자 탁채용 010-1357-2468
+  what_action:
+    in_narrative: true
+    answer: 보증금 30 보냄
+  to_whom:
+    in_narrative: true
+    answer: 탁채용 계좌
+  timeline:
+    in_narrative: false
+    answer: 5일 보내고 7일부터 연락안됨
+  why_believed:
+    in_narrative: false
+    answer: 잡코리아 공고라서요
+  proof:
+    in_narrative: false
+    answer: 카톡 있어요

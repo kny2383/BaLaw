@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: vague-02
+group: vague
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 투자 사기 같은데요 아는사람 통해서 들어갔고 1000 넣었어요
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 몰라요 작년 말쯤?
+  channel_or_place:
+    in_narrative: false
+    answer: 카톡방이요 이름은 기억안나요
+  method:
+    in_narrative: false
+    answer: 이체요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 잘 모르겠어요
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 1000이요
+  quote:
+    in_narrative: false
+    answer: 돈 불려준다고만 했어요 정확히는 기억안나요
+  who:
+    in_narrative: false
+    answer: 아는사람 지인이라는데 누군지 몰라요
+  what_action:
+    in_narrative: true
+    answer: 1000 넣은거요
+  to_whom:
+    in_narrative: false
+    answer: 몰라요
+  timeline:
+    in_narrative: false
+    answer: 넣고 몇달뒤에 사이트가 없어졌어요
+  why_believed:
+    in_narrative: false
+    answer: 아는사람이 소개해서
+  proof:
+    in_narrative: false
+    answer: 없어요

@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: vague-03
+group: vague
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 2026년 7월쯤 알바 수수료 명목으로 20만원을 보냈는데 돌려받지 못했습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 7월 중순인데 날짜는 기억이 안 납니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 어떤 구인 사이트였는지 기억나지 않습니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체였던 것 같습니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 담당자 이름은 모릅니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 20만원입니다.
+  quote:
+    in_narrative: false
+    answer: 수수료를 내면 바로 일을 준다고 했던 것 같습니다.
+  who:
+    in_narrative: false
+    answer: 모릅니다.
+  what_action:
+    in_narrative: true
+    answer: 20만원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 기억나지 않습니다.
+  timeline:
+    in_narrative: false
+    answer: 보내고 나서 연락이 끊겼습니다.
+  why_believed:
+    in_narrative: false
+    answer: 급하게 일이 필요했습니다.
+  proof:
+    in_narrative: false
+    answer: 이체 내역은 은행에서 찾아봐야 합니다.

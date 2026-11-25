@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-leading-room-05
+group: fraud-leading-room
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 데이팅 앱에서 알게 된 사람이 금 선물 투자로 큰돈을 벌었다며 사이트를 알려 주었습니다. 처음엔 수익이 나는 것처럼 보여 총 4,500만원을 넣었는데 출금이 막혔고 그 사람과도 연락이 끊겼습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 7월부터 8월 사이에 다섯 번 입금했습니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 데이팅 앱과 상대가 알려 준 투자 사이트입니다.
+  method:
+    in_narrative: false
+    answer: 사이트가 안내한 계좌로 이체했습니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 데이팅 앱 닉네임 Daniel입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 총 4,500만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"나도 삼촌이 알려 줘서 하는 건데 손해 본 적이 없다"고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 데이팅 앱 닉네임 Daniel, 해외 거주라고 했습니다.
+  what_action:
+    in_narrative: true
+    answer: 투자 사이트에 4,500만원을 입금했습니다.
+  to_whom:
+    in_narrative: false
+    answer: 사이트가 매번 다른 계좌를 안내했습니다.
+  timeline:
+    in_narrative: false
+    answer: 6월 앱에서 대화 시작, 7~8월 입금, 9월 출금 거절 후 상대가 앱을 탈퇴했습니다.
+  why_believed:
+    in_narrative: false
+    answer: 몇 달 동안 매일 대화해서 가까운 사이라고 생각했습니다.
+  proof:
+    in_narrative: false
+    answer: 대화 캡처와 이체 내역이 있습니다.

@@ -1,46 +1,27 @@
 # 평가 사례 작성 양식
-# 파일 이름: <묶음>-<번호>.yaml  (예: fraud-used-goods-01.yaml)
+# 사례는 보통 eval/cases_src/*.py에 데이터로 적고 build_cases.py로 만든다. 이 파일은 형식 참고용이다.
 # 모든 인물·계좌·전화번호·주소는 가상이어야 한다. 이 파일은 공개 레포에 올라가고 OpenAI로 전송된다.
 
 id: fraud-used-goods-00
 group: fraud-used-goods        # 지표 문서의 평가 세트 묶음
 split: dev                     # dev: 개선 중 보는 세트 / holdout: 잠가 두는 보류 세트
-author: claude                 # 작성자 (claude / 김나영 / 기존 문서). 편향 점검용
+author: claude                 # 작성자
+style: 정돈                     # 정돈 / 구어체 (맞춤법·띄어쓰기가 틀리고 순서가 뒤섞인 실제 사용자 말투)
 
-# 사용자가 화면에서 고른 죄목과, 시스템이 해야 할 처리
-offense_selected: 사기          # 작성 화면에서 고른 이름 그대로
+offense_selected: 사기          # 작성 화면에서 고른 이름 그대로 (사기 / 사이버사기 / 모욕 / 횡령 ...)
 expected_offense: fraud        # fraud / insult / unsupported
 gold_crime_label: 사기          # 판례 키워드 예측(M4)과 판례 주된 죄명(M6)의 정답
+run_conversation: true         # false면 대화 시작 응답만 보고 끝낸다 (미지원 죄목)
 
-# 사용자가 처음 입력하는 사건 서술 (일상어, 감정이 섞여도 좋다)
-narrative: >-
-  여기에 사건 서술을 쓴다.
+# 사용자가 처음 입력하는 사건 서술
+narrative: 여기에 사건 서술을 쓴다.
 
 # 서술이나 답변에 등장하는 식별정보 (M9: LLM 요청에 원문이 들어갔는지 검사)
-pii:
-  names: []
-  phones: []
-  accounts: []
-  addresses: []
+pii: {names: [], phones: [], accounts: [], addresses: []}
 
-# 필수 정보(slot)별 정답
-#   in_narrative: 처음 서술에 이미 들어 있으면 true (M2 재현율·정밀도의 정답)
-#   answer: AI가 이 항목을 물으면 모의 사용자가 돌려줄 답. 모르는 경우 "모르겠어요" 같은 실제 표현을 쓴다
+# 필수 정보(slot)별 정답. 사기는 12개, 모욕은 7개
+#   in_narrative: 처음 서술에 이미 들어 있으면 true (M2의 정답)
+#   answer: AI가 이 항목을 물으면 모의 사용자가 돌려줄 답. 모르면 "기억 안 나요" 같은 실제 표현을 쓴다
+# 지어낸 사실(M1)은 처음 서술과 모의 사용자가 실제로 한 답 전체를 근거로 판정한다.
 slots:
-  date:                        {in_narrative: false, answer: ""}
-  channel_or_place:            {in_narrative: false, answer: ""}
-  method:                      {in_narrative: false, answer: ""}
-  recipient_name_or_handle:    {in_narrative: false, answer: ""}
-  amount_numeric_or_item_value: {in_narrative: false, answer: ""}
-  quote:                       {in_narrative: false, answer: ""}
-  who:                         {in_narrative: false, answer: ""}
-  what_action:                 {in_narrative: false, answer: ""}
-  to_whom:                     {in_narrative: false, answer: ""}
-  timeline:                    {in_narrative: false, answer: ""}
-  why_believed:                {in_narrative: false, answer: ""}
-  proof:                       {in_narrative: false, answer: ""}
-
-# 초안에 들어가도 되는 사실 (M1: 이 목록과 대화 입력에 없는 사실이 초안에 나오면 '지어낸 사실')
-allowed_facts: []
-
-notes: ""
+  date: {in_narrative: false, answer: ""}

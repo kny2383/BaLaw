@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-jeonse-05
+group: fraud-jeonse
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 신축 빌라 분양대행사가 전세 계약을 하면 이사 지원금 500만원을 준다며 시세보다 높은 보증금으로 계약하게 했습니다. 지원금은 받지 못했고 집주인은 바지사장이었습니다.
+pii:
+  names:
+  - 김바지
+  phones: []
+  accounts: []
+  addresses:
+  - 서울특별시 가상구 신축로 3
+slots:
+  date:
+    in_narrative: false
+    answer: 2025년 9월 5일 계약했습니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 서울 가상구 신축로 3 신축 빌라, 분양대행사 사무실에서 계약했습니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 명의상 집주인 김바지이고, 대행사 이름은 가상분양입니다.
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 보증금 2억 3천만원입니다. 시세는 1억 7천 정도였습니다.
+  quote:
+    in_narrative: true
+    answer: '"이사 지원금 500만원 드리고 보증보험도 다 된다"고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 분양대행사 직원과 명의상 집주인 김바지입니다.
+  what_action:
+    in_narrative: false
+    answer: 보증금 2억 3천만원을 집주인 계좌로 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 김바지 명의 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 9월 5일 계약, 지원금은 한 달 뒤 준다고 했지만 지급되지 않았고, 2026년 9월 보증보험 가입이 거절됐습니다.
+  why_believed:
+    in_narrative: false
+    answer: 대행사가 보증보험 가입이 된다고 서류까지 보여 줬습니다.
+  proof:
+    in_narrative: false
+    answer: 계약서와 지원금 약정 문자가 있습니다.

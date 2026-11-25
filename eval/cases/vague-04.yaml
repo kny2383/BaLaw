@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: vague-04
+group: vague
+split: holdout
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 보이스피싱 당했어요 근데 너무 정신없어서 기억이 잘 안나요
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 지난주 화요일? 수요일?
+  channel_or_place:
+    in_narrative: false
+    answer: 전화요
+  method:
+    in_narrative: false
+    answer: 이체했어요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 검찰이라고 했던거같아요
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 500이었나 600이었나
+  quote:
+    in_narrative: false
+    answer: 기억 안나요 무서운 말 했어요
+  who:
+    in_narrative: false
+    answer: 몰라요
+  what_action:
+    in_narrative: false
+    answer: 돈 보냈어요
+  to_whom:
+    in_narrative: false
+    answer: 불러준 계좌요 번호는 몰라요
+  timeline:
+    in_narrative: false
+    answer: 전화받고 바로 보냈어요
+  why_believed:
+    in_narrative: false
+    answer: 너무 무서워서요
+  proof:
+    in_narrative: false
+    answer: 통화기록은 있을거에요

@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-voice-phishing-04
+group: fraud-voice-phishing
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 택배 주소가 잘못됐다는 문자의 링크를 눌렀다가 원격조종 앱이 설치되었습니다. 그 후 제 계좌에서 모르는 사이 두 번에 걸쳐 총 430만원이 빠져나갔습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 9월 30일 밤에 링크를 눌렀고 10월 1일 새벽에 돈이 빠져나갔습니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 문자 메시지 링크입니다.
+  method:
+    in_narrative: false
+    answer: 제 휴대폰 뱅킹 앱으로 누군가 이체했습니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 모릅니다. 받은 계좌 예금주는 두 사람이었는데 이름이 기억나지 않습니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 총 430만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"[택배] 주소지 불일치로 반송 예정, 주소 확인"이라는 문자였습니다.'
+  who:
+    in_narrative: false
+    answer: 모릅니다.
+  what_action:
+    in_narrative: false
+    answer: 링크를 눌러 앱을 설치했고 돈은 제가 보낸 게 아닙니다.
+  to_whom:
+    in_narrative: false
+    answer: 모르는 계좌 두 개입니다.
+  timeline:
+    in_narrative: false
+    answer: 9월 30일 밤 11시 링크 클릭, 10월 1일 새벽 2시와 3시에 이체됨, 아침에 확인했습니다.
+  why_believed:
+    in_narrative: false
+    answer: 택배를 기다리던 중이라 의심하지 않았습니다.
+  proof:
+    in_narrative: false
+    answer: 문자와 은행 거래 내역이 있습니다.

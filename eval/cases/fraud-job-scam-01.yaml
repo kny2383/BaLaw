@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-job-scam-01
+group: fraud-job-scam
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 구인 사이트에서 재택 상품 검수 알바에 지원했는데, 회사가 업무용 장비 보증금이 필요하다며 35만원을 먼저 보내라고 했습니다. 2026년 9월 8일에 보냈지만 장비도 오지 않고 담당자가 연락을 끊었습니다.
+pii:
+  names:
+  - 윤채용
+  phones:
+  - 070-0000-1111
+  accounts:
+  - 020-11-223344
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 9월 8일 오전 10시쯤입니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 구인 사이트와 담당자 카카오톡입니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 회사 이름은 가상물류, 담당자 윤채용 과장입니다. 계좌 020-11-223344입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 35만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"보증금은 첫 월급 때 돌려드린다, 하루 2시간에 월 150"이라고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 가상물류 윤채용 과장, 회사 번호 070-0000-1111입니다.
+  what_action:
+    in_narrative: true
+    answer: 보증금 35만원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 가상물류 명의라고 한 계좌인데 예금주는 윤채용 개인이었습니다.
+  timeline:
+    in_narrative: false
+    answer: 9월 5일 지원, 7일 합격 연락, 8일 송금, 10일부터 연락 두절입니다.
+  why_believed:
+    in_narrative: false
+    answer: 유명 구인 사이트에 올라온 공고였습니다.
+  proof:
+    in_narrative: false
+    answer: 공고 캡처, 카톡 대화, 이체 내역이 있습니다.

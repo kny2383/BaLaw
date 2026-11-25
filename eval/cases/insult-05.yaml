@@ -1,0 +1,39 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: insult-05
+group: insult
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 모욕
+expected_offense: insult
+gold_crime_label: 모욕
+run_conversation: true
+narrative: 유튜브 제 채널 영상 댓글에 특정 시청자가 몇 주째 외모를 비하하는 댓글을 달고 있습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 10월부터 지금까지 매주 달립니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 유튜브 댓글입니다.
+  accused_info:
+    in_narrative: false
+    answer: 유튜브 아이디 @hater_kim입니다.
+  audience_scope:
+    in_narrative: false
+    answer: 구독자 3만 명 채널이라 누구나 볼 수 있습니다.
+  how_identified:
+    in_narrative: false
+    answer: 제 채널이고 제 얼굴이 나오는 영상에 단 댓글입니다.
+  quote:
+    in_narrative: false
+    answer: '"돼지 같은 얼굴로 방송하지 마라"는 식입니다.'
+  target:
+    in_narrative: true
+    answer: 제 영상에 단 댓글이라 저를 향한 겁니다.
+notes: 결정 0001에 따른 보류 판단용 사례

@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-used-goods-04
+group: fraud-used-goods
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 중고 거래 카페에서 캠핑용 텐트를 45만원에 구매하기로 하고 판매자에게 송금했습니다. 판매자는 송장번호를 보내 주었는데 조회해 보니 존재하지 않는 번호였고, 이후 전화를 받지 않습니다.
+pii:
+  names:
+  - 최허위
+  phones:
+  - 010-4444-5555
+  accounts:
+  - 1002-000-222222
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 9월 20일 오전 11시쯤 송금했습니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 네이버 캠핑 중고 거래 카페입니다.
+  method:
+    in_narrative: true
+    answer: 우리은행 계좌로 송금했습니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 카페 아이디 campking이고 예금주는 최허위입니다. 우리은행 1002-000-222222입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 45만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"오늘 오후에 CJ대한통운으로 발송했다"며 송장번호를 보냈습니다.'
+  who:
+    in_narrative: false
+    answer: 카페 아이디 campking, 전화번호 010-4444-5555입니다.
+  what_action:
+    in_narrative: true
+    answer: 45만원을 송금했습니다.
+  to_whom:
+    in_narrative: false
+    answer: 판매자가 알려준 우리은행 계좌, 예금주 최허위입니다.
+  timeline:
+    in_narrative: false
+    answer: 9월 20일 송금, 같은 날 오후 가짜 송장번호 받음, 22일 조회 안 되는 걸 확인하고 전화했지만 받지 않았습니다.
+  why_believed:
+    in_narrative: false
+    answer: 송장번호까지 보내 줘서 실제로 발송한 줄 알았습니다.
+  proof:
+    in_narrative: false
+    answer: 카페 쪽지 캡처, 송장번호 메시지, 이체 내역이 있습니다.

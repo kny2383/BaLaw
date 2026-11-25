@@ -1,0 +1,17 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: unsupported-embezzlement-02
+group: unsupported
+split: dev
+author: claude
+style: 정돈
+offense_selected: 횡령
+expected_offense: unsupported
+gold_crime_label: 횡령
+run_conversation: false
+narrative: 동호회 총무가 회비 통장에 있던 340만원을 회원들 몰래 개인 용도로 쓴 것을 확인했습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+notes: 대화는 진행하지 않고 대화 시작 응답의 죄목 처리(M5)와 판례 키워드(M4)만 본다

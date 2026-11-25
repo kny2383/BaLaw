@@ -1,0 +1,40 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: insult-01
+group: insult
+split: dev
+author: claude
+style: 정돈
+offense_selected: 모욕
+expected_offense: insult
+gold_crime_label: 모욕
+run_conversation: true
+narrative: 2026년 10월 12일 밤 고등학교 동창 단체 카톡방(32명)에서 동창 한 명이 제 실명을 부르며 '머리에 똥만 찬 X'라고 욕을 했습니다. 다른 사람들도 다 봤습니다.
+pii:
+  names:
+  - 조욕설
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 10월 12일 밤 11시쯤입니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 고등학교 동창 카카오톡 단체방입니다.
+  accused_info:
+    in_narrative: false
+    answer: 동창 조욕설입니다. 카톡 이름도 실명입니다.
+  audience_scope:
+    in_narrative: true
+    answer: 32명이 있는 단체방입니다.
+  how_identified:
+    in_narrative: true
+    answer: 제 실명을 직접 불렀습니다.
+  quote:
+    in_narrative: true
+    answer: '"머리에 똥만 찬 X"라고 했습니다.'
+  target:
+    in_narrative: true
+    answer: 제 이름을 부르며 한 말이라 저를 향한 겁니다.
+notes: 결정 0001에 따른 보류 판단용 사례

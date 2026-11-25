@@ -1,0 +1,55 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: sparse-01
+group: sparse
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 사기 당했어요 돈 보냈는데 연락이 안돼요
+pii:
+  names:
+  - 문연락
+  phones: []
+  accounts:
+  - 111-22-333333
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 11월 15일이요
+  channel_or_place:
+    in_narrative: false
+    answer: 인스타그램 마켓이요
+  method:
+    in_narrative: false
+    answer: 계좌이체요
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 판매자 문연락이요 계좌는 111-22-333333
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 12만원이요
+  quote:
+    in_narrative: false
+    answer: 주문 확인됐고 3일 안에 배송된다고 했어요
+  who:
+    in_narrative: false
+    answer: 인스타 마켓 판매자 문연락이요
+  what_action:
+    in_narrative: false
+    answer: 옷값 12만원 입금했어요
+  to_whom:
+    in_narrative: false
+    answer: 판매자 계좌요
+  timeline:
+    in_narrative: false
+    answer: 15일 입금했는데 일주일 지나도 안오고 DM 답이 없어요
+  why_believed:
+    in_narrative: false
+    answer: 팔로워가 많았어요
+  proof:
+    in_narrative: false
+    answer: DM 캡처 있어요

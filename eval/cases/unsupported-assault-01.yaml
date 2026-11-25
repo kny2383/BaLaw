@@ -1,0 +1,17 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: unsupported-assault-01
+group: unsupported
+split: dev
+author: claude
+style: 정돈
+offense_selected: 폭행
+expected_offense: unsupported
+gold_crime_label: 폭행
+run_conversation: false
+narrative: 편의점 앞에서 술 취한 남성이 시비를 걸다가 제 얼굴을 주먹으로 때렸습니다. 다친 데는 없지만 너무 무서웠습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+notes: 대화는 진행하지 않고 대화 시작 응답의 죄목 처리(M5)와 판례 키워드(M4)만 본다

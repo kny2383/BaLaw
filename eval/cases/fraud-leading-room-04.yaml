@@ -1,0 +1,54 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-leading-room-04
+group: fraud-leading-room
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 재테크 강의를 한다는 사람이 비상장 주식을 싸게 넘겨주겠다며 계약서를 써 주었고, 저는 2026년 4월 20일 2천만원을 보냈습니다. 약속한 상장일이 지났지만 주식은 받지 못했고 회사도 실체가 없습니다.
+pii:
+  names:
+  - 송강사
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 4월 20일입니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 오프라인 재테크 강의장에서 만났고 계약은 카페에서 했습니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 강사 송강사입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 2천만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"9월에 상장 확정이라 지금 사면 세 배"라고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 재테크 강사 송강사입니다.
+  what_action:
+    in_narrative: true
+    answer: 비상장 주식 대금으로 2천만원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 송강사 명의 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 4월 강의 수강, 20일 계약과 송금, 9월 상장일이 지나고 확인해 보니 회사 등기가 없었습니다.
+  why_believed:
+    in_narrative: false
+    answer: 계약서와 주권 사본을 줘서 믿었습니다.
+  proof:
+    in_narrative: false
+    answer: 계약서와 주권 사본, 이체 내역이 있습니다.

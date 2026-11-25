@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-jeonse-01
+group: fraud-jeonse
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 2024년 3월에 빌라 전세 계약을 하고 보증금 1억 8천만원을 집주인에게 보냈습니다. 계약 만기인 2026년 3월이 지났는데 집주인이 돈이 없다며 보증금을 돌려주지 않고, 알고 보니 같은 건물 여러 세대가 같은 상황입니다.
+pii:
+  names:
+  - 정임대
+  phones:
+  - 010-5555-6666
+  accounts: []
+  addresses:
+  - 서울특별시 가상구 가상로 12, 302호
+slots:
+  date:
+    in_narrative: true
+    answer: 계약은 2024년 3월 10일이고 잔금은 3월 30일에 보냈습니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 서울특별시 가상구 가상로 12 빌라 302호이고, 계약은 근처 공인중개사 사무실에서 했습니다.
+  method:
+    in_narrative: false
+    answer: 계약금은 계좌이체, 잔금은 전세자금대출 실행으로 집주인 계좌에 들어갔습니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 집주인 정임대입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 보증금 1억 8천만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"선순위 대출 없고 만기 때 바로 돌려준다, 다른 세입자도 다 문제없다"고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 집주인 정임대, 연락처 010-5555-6666입니다.
+  what_action:
+    in_narrative: true
+    answer: 보증금 1억 8천만원을 지급했습니다.
+  to_whom:
+    in_narrative: false
+    answer: 집주인 정임대 명의 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 2024년 3월 계약, 2026년 3월 만기, 만기 이후 계속 미루다가 6월부터 연락이 잘 안 됩니다.
+  why_believed:
+    in_narrative: false
+    answer: 중개사가 문제없는 집이라고 했고 집주인이 여러 채를 가진 임대사업자라고 해서 믿었습니다.
+  proof:
+    in_narrative: false
+    answer: 임대차계약서, 이체 내역, 문자 내역이 있습니다.

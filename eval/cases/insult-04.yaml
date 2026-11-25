@@ -1,0 +1,39 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: insult-04
+group: insult
+split: dev
+author: claude
+style: 정돈
+offense_selected: 모욕
+expected_offense: insult
+gold_crime_label: 모욕
+run_conversation: true
+narrative: 동네 맘카페에 누군가 제 가게 이름과 저를 지칭하며 '사기꾼 같은 년'이라는 댓글을 달았습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 8월 28일 오후에 댓글이 달렸습니다.
+  channel_or_place:
+    in_narrative: true
+    answer: 지역 맘카페 게시판 댓글입니다.
+  accused_info:
+    in_narrative: false
+    answer: 카페 닉네임 동네지킴이입니다.
+  audience_scope:
+    in_narrative: false
+    answer: 회원이 2만 명인 공개 게시판입니다.
+  how_identified:
+    in_narrative: true
+    answer: 제 가게 이름을 적었고 동네 사람들은 제가 사장인 걸 압니다.
+  quote:
+    in_narrative: true
+    answer: '"사기꾼 같은 년"이라고 했습니다.'
+  target:
+    in_narrative: true
+    answer: 가게 이름과 함께 저를 가리켰습니다.
+notes: 결정 0001에 따른 보류 판단용 사례

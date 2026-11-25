@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-job-scam-05
+group: fraud-job-scam
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 고액 알바라며 통장을 빌려주면 하루 10만원을 준다는 제안을 받았는데, 그 전에 신원 확인 비용으로 50만원을 먼저 보내라고 했습니다. 보냈더니 연락이 끊겼습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 2026년 11월 2일 저녁입니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 인스타그램 DM으로 연락이 왔습니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 인스타그램 아이디 easy_money_job입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 50만원입니다.
+  quote:
+    in_narrative: true
+    answer: '"통장만 빌려주면 하루 10만원"이라고 했습니다.'
+  who:
+    in_narrative: false
+    answer: 인스타그램 아이디 easy_money_job입니다.
+  what_action:
+    in_narrative: true
+    answer: 신원 확인 비용 50만원을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 상대가 알려 준 계좌입니다. 계좌번호는 기억나지 않습니다.
+  timeline:
+    in_narrative: false
+    answer: 11월 1일 DM, 2일 송금, 3일부터 계정이 사라졌습니다.
+  why_believed:
+    in_narrative: false
+    answer: 돈이 급해서 의심을 덜 했습니다.
+  proof:
+    in_narrative: false
+    answer: DM 캡처는 계정이 사라져서 없고 이체 내역만 있습니다.

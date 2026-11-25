@@ -1,0 +1,53 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: vague-05
+group: vague
+split: dev
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 전세 보증금을 돌려받지 못하고 있습니다.
+pii:
+  names: []
+  phones: []
+  accounts: []
+  addresses: []
+slots:
+  date:
+    in_narrative: false
+    answer: 계약 날짜는 서류를 찾아봐야 알 것 같습니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 빌라입니다.
+  method:
+    in_narrative: false
+    answer: 계좌이체였습니다.
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 집주인 이름이 정확히 기억나지 않습니다.
+  amount_numeric_or_item_value:
+    in_narrative: false
+    answer: 1억 정도였습니다.
+  quote:
+    in_narrative: false
+    answer: 특별히 기억나는 말은 없습니다.
+  who:
+    in_narrative: false
+    answer: 집주인입니다.
+  what_action:
+    in_narrative: false
+    answer: 보증금을 보냈습니다.
+  to_whom:
+    in_narrative: false
+    answer: 집주인 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 만기가 지났는데 돌려주지 않습니다.
+  why_believed:
+    in_narrative: false
+    answer: 중개사를 믿었습니다.
+  proof:
+    in_narrative: false
+    answer: 계약서는 집 어딘가에 있을 겁니다.

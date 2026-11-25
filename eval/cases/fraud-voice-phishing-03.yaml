@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: fraud-voice-phishing-03
+group: fraud-voice-phishing
+split: dev
+author: claude
+style: 구어체
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 저금리대출 해준다는 전화받고 기존대출 갚아야 된다고해서 직원한테 현금 줬어요 근데 그게 보이스피싱이었대요 엄마가 당한건데 대신 써요 700만원이요
+pii:
+  names:
+  - 최수거
+  phones:
+  - 010-6060-7070
+  accounts: []
+  addresses:
+  - 경기도 가상시 역앞길 1
+slots:
+  date:
+    in_narrative: false
+    answer: 11월 12일 오후요
+  channel_or_place:
+    in_narrative: false
+    answer: 전화로 연락받고 경기도 가상시 역앞길 1 근처에서 만나서 줬어요
+  method:
+    in_narrative: true
+    answer: 현금이요 직접 만나서
+  recipient_name_or_handle:
+    in_narrative: false
+    answer: 은행 직원이라고 한 최수거요
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 700만원이요
+  quote:
+    in_narrative: false
+    answer: 기존 대출을 현금으로 상환해야 저금리 대환대출 승인된다고 했대요
+  who:
+    in_narrative: false
+    answer: 가상캐피탈 직원이라고 한 최수거 010-6060-7070
+  what_action:
+    in_narrative: true
+    answer: 현금 700 건넨거요
+  to_whom:
+    in_narrative: false
+    answer: 직원이라고 온 최수거한테요
+  timeline:
+    in_narrative: false
+    answer: 10일 전화 12일 현금전달 13일 은행 가서 알았어요
+  why_believed:
+    in_narrative: false
+    answer: 엄마 대출 정보를 다 알고 있었대요
+  proof:
+    in_narrative: false
+    answer: 통화기록이랑 문자 있어요

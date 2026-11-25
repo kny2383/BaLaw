@@ -1,0 +1,56 @@
+# 생성: eval/cases_src/build_cases.py. 모든 인물·계좌·전화번호·주소는 가상이다.
+id: pii-04
+group: pii
+split: holdout
+author: claude
+style: 정돈
+offense_selected: 사기
+expected_offense: fraud
+gold_crime_label: 사기
+run_conversation: true
+narrative: 리딩방 운영자 권사칭이 알려 준 국민은행 777-21-0099-888 계좌로 2026년 7월 3일 2천만원을 보냈습니다. 권사칭의 연락처는 010-9753-1086입니다.
+pii:
+  names:
+  - 권사칭
+  phones:
+  - 010-9753-1086
+  accounts:
+  - 777-21-0099-888
+  addresses: []
+slots:
+  date:
+    in_narrative: true
+    answer: 2026년 7월 3일입니다.
+  channel_or_place:
+    in_narrative: false
+    answer: 텔레그램 리딩방입니다.
+  method:
+    in_narrative: true
+    answer: 계좌이체입니다.
+  recipient_name_or_handle:
+    in_narrative: true
+    answer: 권사칭, 국민은행 777-21-0099-888입니다.
+  amount_numeric_or_item_value:
+    in_narrative: true
+    answer: 2천만원입니다.
+  quote:
+    in_narrative: false
+    answer: '"원금 보장에 월 20% 수익"이라고 했습니다.'
+  who:
+    in_narrative: true
+    answer: 리딩방 운영자 권사칭, 010-9753-1086입니다.
+  what_action:
+    in_narrative: true
+    answer: 2천만원을 보냈습니다.
+  to_whom:
+    in_narrative: true
+    answer: 권사칭이 알려 준 국민은행 계좌입니다.
+  timeline:
+    in_narrative: false
+    answer: 6월 리딩방 가입, 7월 3일 송금, 8월 출금 거절입니다.
+  why_believed:
+    in_narrative: false
+    answer: 수익 인증 사진을 많이 보여 줬습니다.
+  proof:
+    in_narrative: false
+    answer: 텔레그램 캡처와 이체 내역이 있습니다.
