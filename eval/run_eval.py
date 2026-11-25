@@ -12,6 +12,9 @@
   6. 판정 모델로 지어낸 사실(M1)과 성립 단정 표현(M8)을 판정
 
 지표 정의는 docs/metrics.md, 판정 공급자 구조는 결정 0002를 따른다.
+
+가상 사례 전용이다. 사건 서술과 답변 원문이 서비스와 판정 모델(외부 API)로 그대로 전송되므로
+실제 사용자 서술을 eval/cases에 넣거나 --only로 실행하지 않는다 (요구사항 S05).
 결과는 eval/runs/<run-id>/ (git 제외)와 eval/results/<run-id>.md (커밋용 요약)에 남긴다.
 """
 
@@ -469,13 +472,18 @@ def main() -> int:
                         "redis", "redis-cli", "FLUSHDB"], cwd=REPO, check=True, capture_output=True)
     # 예열: 재시작 직후 판례 DB 연결을 미리 만들어 둔다. 예열 호출은 별도 실행 이름으로 기록한다.
     proxy_control(args.proxy_url, {"run_id": f"{args.run_id}-warmup", "case_id": "", "fail_rate": 0})
+    warmup = "init 실패"
     st, w, _ = http("POST", f"{args.ai_url}/chat/init", {"text": "예열용 요청입니다. 중고거래 사기", "offense": "사기"})
     if st == 200 and w:
+        warmup = "timeout"
         for _ in range(60):
             _, rr, _ = http("GET", f"{args.ai_url}/chat/rag/{w['session_id']}")
             if (rr or {}).get("rag_status") != "pending":
+                warmup = (rr or {}).get("rag_status")
                 break
             time.sleep(2)
+    if warmup != "ready":
+        print(f"경고: 예열 결과가 {warmup}다. 첫 사례들의 지연과 판례 검색 실패가 섞일 수 있다.", flush=True)
     if args.flush_cache:  # 예열이 만든 캐시도 비운다
         subprocess.run(["docker", "compose", "-f", "compose.yaml", "-f", "compose.eval.yaml", "exec", "-T",
                         "redis", "redis-cli", "FLUSHDB"], cwd=REPO, check=True, capture_output=True)
@@ -510,7 +518,7 @@ def main() -> int:
         "git_head": git_head(), "split": args.split if not args.only else f"only {len(args.only)}",
         "cases_lock": cases_lock()[:16], "service_models": ", ".join(m for m in service_models if m),
         "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "prices_as_of": prices["as_of"],
-        "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1),
+        "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1), "warmup": warmup,
     }
     (run_dir / "summary.json").write_text(json.dumps({"meta": meta, "summary": summary}, ensure_ascii=False, indent=1), encoding="utf-8")
     (ROOT / "results").mkdir(exist_ok=True)
