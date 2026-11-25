@@ -1,6 +1,6 @@
 {
-  "_note": "USD per 1M tokens. as_of는 이 단가를 확인한 공개 가격의 기준일이며 실험일이 아니다. 기준선 실행 전에 공급자 가격 페이지에서 다시 확인하고 as_of를 갱신한다. 가격표에 없는 모델은 결과의 models_missing_price에 나온다.",
-  "as_of": "2025-08-07",
+  "_note": "USD per 1M tokens. as_of는 공급자 가격 페이지에서 이 단가를 마지막으로 확인한 날이다 (2026-11-25 developers.openai.com/api/docs/pricing 표준 등급과 일치). 기준선 실행 전에 공급자 가격 페이지에서 다시 확인하고 as_of를 갱신한다. 가격표에 없는 모델은 결과의 models_missing_price에 나온다.",
+  "as_of": "2026-11-25",
   "models": {
     "gpt-5-mini-2025-08-07": {"provider": "openai", "input": 0.25, "cached_input": 0.025, "output": 2.00},
     "gpt-5-2025-08-07": {"provider": "openai", "input": 1.25, "cached_input": 0.125, "output": 10.00},
