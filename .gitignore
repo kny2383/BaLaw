@@ -1,0 +1,22 @@
+# 비밀 값: 예시 파일만 커밋한다
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# 로컬 전용 대용량 데이터 (판례 벡터 DB, 원본 판례, 수집 결과)
+/local-data/
+
+# 의존성과 빌드 산출물
+node_modules/
+.pnpm-store/
+dist/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# OS·편집기
+.DS_Store
+.idea/
+.vscode/
