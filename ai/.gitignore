@@ -1,0 +1,14 @@
+*.docx
+*.pdf
+.env
+__pycache__/
+*.py[cod]
+*.hwp
+.hwpx
+fraud1.json
+fraud2.json
+*jsonl
+*.bin
+*.pickle
+*.sqlite3
+*.xlsx

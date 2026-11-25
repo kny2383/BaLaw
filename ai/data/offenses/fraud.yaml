@@ -1,0 +1,117 @@
+offense: fraud
+title_ko: 사기
+statute_ref: "형법 제347조"
+
+includes:
+  - party_info
+
+details:
+  - id: detail_datetime
+    label: 일시
+    slots:
+      must: ["date"]
+      nice_to_have: []
+    questions:
+      date: "사건이 언제 발생했나요? 가능한 정확히 말해주세요.\n(예: 2026-1-1 오후 9시에 권유, 2026-1-3 오후 3시에 송금)"
+
+  - id: detail_place_or_platform
+    label: 플랫폼/앱 또는 장소
+    slots:
+      must: ["channel_or_place"]
+      nice_to_have: []
+    questions:
+      channel_or_place: "거래/연락은 어디서 이뤄졌나요? 대면이었다면 장소의 구체적인 위치(예: OO구 OO카페)를, 비대면이었다면 사용한 플랫폼/앱 이름을 알려주세요. (예: 당근마켓, 카카오톡, 텔레그램 등)"
+  - id: detail_transfer
+    label: 금전 처분 방식
+    slots:
+      must: ["method"]
+      nice_to_have: []
+    questions:
+      method: "금전 거래는 어떤 방식으로 이루어졌나요? \n(계좌이체/현금/수표/카드/페이/택배대금 등)"
+
+  - id: detail_recipient
+    label: 거래 상대 식별
+    slots:
+      must: ["recipient_name_or_handle"]
+      nice_to_have: ["bank_name"]
+    questions:
+      recipient_name_or_handle: "상대방(수취인/지급의무자)을 식별할 수 있는 정보를 알려주세요. (예: 이름/닉네임/상호 등)"
+      bank_name: "계좌주·계좌번호 또는 프로필/계정 링크가 있으면 알려주세요."
+
+  - id: detail_amount
+    label: 금액/가액 및 거래 품목/서비스
+    slots:
+      must: ["amount_numeric_or_item_value"]
+      nice_to_have: []
+    questions:
+      amount_numeric_or_item_value: "사기당한 금액(숫자) 또는 물건과 그 가액을 정확히 적어주세요. \n(예: 1,000,000원 / OO브랜드 옷 1개 10만원 상당)"
+elements:
+  - id: deception
+    label: 기망행위
+    required: true
+    slots:
+      must: ["quote", "who"]
+      nice_to_have: ["role_claim", "third_party", "doc_or_link"]
+    questions:
+      - id: dec_quote
+        slot: quote
+        text: "상대가 어떻게 당신을 속였는지 가능한 그대로 다시 말해주세요. \n(예: “시세보다 20% 싸게 해줄게”)"
+      - id: dec_who
+        slot: who
+        text: "당신을 속인 사람의 신원을 아는대로 말해주세요. (이름/별칭/관계, 직함/소속 등)"
+      - id: dec_role
+        slot: role_claim
+        text: "상대가 특정 직업/직함을 말한 적이 있나요? (예: ㈜○○ OO팀장)"
+      - id: dec_third
+        slot: third_party
+        text: "다른 사람/회사/기관을 끌어들여 말한 적이 있나요?\n (예: 상가 주인/컨설팅 회사)"
+      - id: dec_link
+        slot: doc_or_link
+        text: "관련 홍보자료/사이트/게시물 링크가 있나요?"
+
+  - id: disposition
+    label: 처분행위
+    required: true
+    slots:
+      must: ["what_action", "to_whom"]
+      nice_to_have: ["contract"]
+    questions:
+      - id: disp_what
+        slot: what_action
+        text: "그 말을 믿고 어떤 행동을 했나요? (돈 보냄/물건 전달/계약함 등)"
+      - id: disp_to
+        slot: to_whom
+        text: "누구에게 건네거나 보냈나요? (이름/계좌주 등)"
+      - id: disp_contract
+        slot: contract
+        text: "계약서/영수증/메모 등 문서가 있나요? 있으면 종류와 대략 내용을 적어주세요. 해당 내역은 별지로 함께 제출해 주시면 됩니다."
+
+  - id: causation
+    label: 인과관계
+    required: true
+    slots:
+      must: ["timeline", "why_believed"]
+    questions:
+      - id: cau_timeline
+        slot: timeline
+        text: "어떤 과정을 거쳐 돈을 보내거나 물건을 건네주게 되었는지 전체적인 흐름을 적어주세요."
+      - id: cau_why
+        slot: why_believed
+        text: "왜 그 말을 믿고 행동했나요? (믿게 된 이유/상대의 말/상황)"
+
+  - id: property_gain
+    label: 재산상 손해
+    required: true
+    slots:
+      must: ["proof"]
+      nice_to_have: ["recovery_status"]
+    questions:
+      - id: pg_proof
+        slot: proof
+        text: "금전 거래와 관련해 상대방이 약속을 지키지 않은 사실을 보여줄 자료가 있나요? 해당 내역은 별지로 함께 제출해 주시면 됩니다. (예: 송금내역, 미지급 대금 관련 대화 캡처, 통장사본, 계약서 등)"
+      - id: pg_recovery
+        slot: recovery_status
+        text: "지금까지 돌려받은 금액/물건이 있나요? 있다면 얼마/어떤 것인가요?"
+
+templates:
+  complaint_purpose: "피고소인을 사기죄로 엄중 처벌하여 주시기 바랍니다."
