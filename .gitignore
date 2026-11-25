@@ -23,3 +23,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# 평가 실행 기록 (사례 서술과 LLM 요청 본문이 들어 있음)
+/eval/runs/

@@ -1,0 +1,30 @@
+# 평가용 덧붙임 구성: AI 서비스의 OpenAI 호출을 기록 장치(llm-proxy)로 보낸다.
+#
+#   docker compose -f compose.yaml -f compose.eval.yaml up -d
+#
+# 기록은 eval/runs/llm_calls.jsonl 에 쌓이고 git에서 제외된다.
+# 평소 개발 때는 compose.yaml 만 쓰면 기록 장치 없이 OpenAI에 바로 연결된다.
+
+services:
+  llm-proxy:
+    image: python:3.12-slim
+    command: ["python", "/app/llm_proxy.py"]
+    environment:
+      LLM_LOG_PATH: /logs/llm_calls.jsonl
+    volumes:
+      - ./eval/llm_proxy.py:/app/llm_proxy.py:ro
+      - ./eval/runs:/logs
+    ports:
+      - "127.0.0.1:8090:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/_health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ai:
+    environment:
+      OPENAI_BASE_URL: http://llm-proxy:8080/v1
+    depends_on:
+      llm-proxy:
+        condition: service_healthy
