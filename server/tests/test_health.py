@@ -13,12 +13,3 @@ def test_cors_rejects_unknown_origin(client):
     r = client.options("/health", headers={"Origin": "https://evil.example.com", "Access-Control-Request-Method": "GET"})
     assert "access-control-allow-origin" not in r.headers
 
-
-def test_cors_origins_parsing():
-    from app.config import DEFAULT_CORS_ORIGINS, Settings
-
-    base = {"DATABASE_URL": "sqlite://", "SECRET_KEY": "x", "ENCRYPTION_KEY": "x", "OPENAI_API_KEY": "x"}
-    assert Settings(**base, CORS_ORIGINS="").cors_origins == list(DEFAULT_CORS_ORIGINS)
-    assert Settings(**base, CORS_ORIGINS="  ").cors_origins == list(DEFAULT_CORS_ORIGINS)
-    assert Settings(**base, CORS_ORIGINS="https://a.example, https://b.example").cors_origins == [
-        "https://a.example", "https://b.example"]

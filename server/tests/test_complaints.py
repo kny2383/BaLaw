@@ -62,3 +62,21 @@ def test_chat_init_uses_ai_service(client, user_tokens, monkeypatch):
                     headers=auth_header(user_tokens))
     assert calls, "AI 서비스가 호출되지 않았다"
     assert r.status_code == 200, r.text
+
+
+def test_chat_init_ai_failure_returns_503_and_keeps_complaint(client, db_session, user_tokens, monkeypatch):
+    """AI 서비스가 실패하면 503을 돌려주고 고소장 상태와 대화 기록을 바꾸지 않는다 (지금 동작 기록)."""
+    from app.api import complaint as complaint_api
+    from app.models.chat_message import ChatMessage
+
+    async def failing_chat_init(text, offense=None):
+        raise RuntimeError("upstream down")
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", failing_chat_init)
+    cid = create_complaint(client, user_tokens)
+    r = client.post(f"/api/complaints/{cid}/chat/init", json={"text": "가상의 사건 개요", "offense": "사기"},
+                    headers=auth_header(user_tokens))
+    assert r.status_code == 503
+    db_session.expire_all()
+    assert db_session.get(Complaint, cid).ai_session_id is None
+    assert db_session.query(ChatMessage).filter(ChatMessage.complaint_id == cid).count() == 0
