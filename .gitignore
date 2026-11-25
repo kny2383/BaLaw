@@ -5,7 +5,10 @@
 !.env.*.example
 
 # 로컬 전용 대용량 데이터 (판례 벡터 DB, 원본 판례, 수집 결과)
+# AI 코드가 읽는 원래 위치에 두되 git에서는 제외한다
 /local-data/
+/ai/data/rag_db/
+/ai/crawl/*.jsonl
 
 # 의존성과 빌드 산출물
 node_modules/
