@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: 변경 폴더 확인
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.f.outputs.server }}
+      ai: ${{ steps.f.outputs.ai }}
+      web: ${{ steps.f.outputs.web }}
+      eval: ${{ steps.f.outputs.eval }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: f
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            server: ['server/**', '.github/workflows/ci.yml']
+            ai: ['ai/**', '.github/workflows/ci.yml']
+            web: ['web/**', '.github/workflows/ci.yml']
+            eval: ['eval/**', '.github/workflows/ci.yml']
+
+  python:
+    name: Python 문법 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m compileall -q server/app server/alembic ai eval
+
+  eval-cases:
+    name: 평가 사례 형식·정답 잠금 검사
+    needs: changes
+    if: needs.changes.outputs.eval == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml==6.0.2
+      - run: python eval/check_cases.py
+
+  docker-server:
+    name: 서버 이미지 빌드
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: server
+          push: false
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+  docker-ai:
+    name: AI 이미지 빌드
+    needs: changes
+    if: needs.changes.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ai
+          push: false
+          cache-from: type=gha,scope=ai
+          cache-to: type=gha,mode=max,scope=ai
+
+  web:
+    name: 프론트 린트·빌드
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm exec prettier --check .
+      - run: pnpm run build
+
+  secrets:
+    name: 비밀 값 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
