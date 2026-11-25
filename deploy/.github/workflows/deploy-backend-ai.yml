@@ -1,0 +1,68 @@
+name: Deploy Backend and AI
+
+on:
+  repository_dispatch:
+    types:
+      - deploy-backend-ai
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - "docker-compose.prod.yml"
+      - ".github/workflows/deploy-backend-ai.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-ai
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get runner public IP
+        id: ip
+        uses: haythem/public-ip@v1.3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Allow GitHub Actions runner SSH
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id "${{ secrets.EC2_SECURITY_GROUP_ID }}" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "${{ steps.ip.outputs.ipv4 }}/32"
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            cd "${{ secrets.EC2_PROJECT_PATH }}"
+
+            git -C Baro-AI pull --ff-only
+            git -C baro-backend pull --ff-only
+
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker image prune -f
+
+      - name: Revoke GitHub Actions runner SSH
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "${{ secrets.EC2_SECURITY_GROUP_ID }}" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "${{ steps.ip.outputs.ipv4 }}/32"
