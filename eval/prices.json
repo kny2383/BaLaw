@@ -1,0 +1,13 @@
+{
+  "_note": "USD per 1M tokens. 공급자 공개 가격 기준. 실행 전에 각 공급자 가격 페이지에서 확인하고 as_of를 갱신한다. 모델 판본별로 적는다.",
+  "as_of": "2025-08-07",
+  "models": {
+    "gpt-5-mini-2025-08-07": {"provider": "openai", "input": 0.25, "cached_input": 0.025, "output": 2.00},
+    "gpt-5-2025-08-07": {"provider": "openai", "input": 1.25, "cached_input": 0.125, "output": 10.00},
+    "text-embedding-3-small": {"provider": "openai", "input": 0.02, "cached_input": 0.02, "output": 0.0}
+  },
+  "aliases": {
+    "gpt-5-mini": "gpt-5-mini-2025-08-07",
+    "gpt-5": "gpt-5-2025-08-07"
+  }
+}
