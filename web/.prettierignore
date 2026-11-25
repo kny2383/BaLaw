@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+*.log
+pnpm-lock.yaml
+index.html
+*.html
+public/**/*.html
+
+# msw가 생성하는 서비스워커 (포맷 대상 아님)
+public/mockServiceWorker.js
