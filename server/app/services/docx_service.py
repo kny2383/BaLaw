@@ -1,11 +1,11 @@
 """고소장 DOCX 파일 생성 서비스"""
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from io import BytesIO
-from typing import Dict, Any
+from typing import Dict
 from datetime import datetime
 from sqlalchemy.orm import Session
 

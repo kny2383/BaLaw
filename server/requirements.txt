@@ -19,19 +19,9 @@ pydantic>=2,<3
 pydantic-settings>=2,<3
 email-validator==2.3.0
 python-dotenv>=1.0
-# AWS S3
-boto3==1.35.76
-
-# LLM & RAG
-langchain==0.3.13
-openai==1.57.2
-chromadb==0.5.23
-
 # Utilities
-python-dateutil==2.9.0
 python-docx==1.1.2
 apscheduler==3.10.4
 
-# Development
-pytest==8.3.4
+# HTTP 클라이언트 (AI 서비스 호출)
 httpx==0.28.1

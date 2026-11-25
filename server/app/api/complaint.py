@@ -10,11 +10,11 @@ from app.models.user import User
 from app.models.complaint import Complaint
 from app.models.chat_message import ChatMessage
 from app.schemas.complaint import (
-    ComplaintCreate, ComplaintResponse, ComplaintStartResponse, ComplaintDetail,
-    ComplaintUpdate, ComplaintGenerateRequest, ComplaintGenerateResponse,
+    ComplaintCreate, ComplaintResponse, ComplaintStartResponse,
+    ComplaintGenerateResponse,
     ChatMessageCreate, ChatResponse, ComplainantInfoCreate, AccusedInfoCreate,
     RelatedCasesCreate, EvidenceCreate, ChatInitRequest, ChatInitResponse, RagCase,
-    ChatMessageResponse, ChatHistoryResponse, ChatRagResponse
+    ChatHistoryResponse, ChatRagResponse
 )
 from app.middleware.auth_middleware import get_current_user
 from app.services.encryption_service import encryption_service
