@@ -25,7 +25,10 @@ services:
   ai:
     environment:
       OPENAI_BASE_URL: http://llm-proxy:8080/v1
-      # 평가 중에는 별칭 대신 날짜가 붙은 판본으로 고정한다 (2026-11-25 기준 gpt-5-mini 별칭이 가리키는 판본과 같음)
+      # 평가 중에는 별칭 대신 날짜가 붙은 판본으로 고정한다.
+      # 근거: 운영 구성(deploy/docker-compose.prod.yml)과 ai/.env는 OPENAI_MODEL=gpt-5-mini로 지정해
+      #   작성·대화 모델이 모두 gpt-5-mini다 (cfg.py의 기본값 gpt-5는 운영에서 쓰이지 않음).
+      #   2026-11-25 기록 장치 로그에서 gpt-5-mini 요청의 응답 모델이 gpt-5-mini-2025-08-07이었다.
       OPENAI_MODEL: ${EVAL_SERVICE_MODEL:-gpt-5-mini-2025-08-07}
     depends_on:
       llm-proxy:

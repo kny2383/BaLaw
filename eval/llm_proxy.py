@@ -49,7 +49,9 @@ def _write_log(record: dict) -> None:
 def _usage(body: dict) -> dict:
     u = body.get("usage") or {}
     details = u.get("completion_tokens_details") or u.get("output_tokens_details") or {}
+    prompt_details = u.get("prompt_tokens_details") or u.get("input_tokens_details") or {}
     return {
+        "cached_tokens": prompt_details.get("cached_tokens"),
         "prompt_tokens": u.get("prompt_tokens", u.get("input_tokens")),
         "completion_tokens": u.get("completion_tokens", u.get("output_tokens")),
         "reasoning_tokens": details.get("reasoning_tokens"),

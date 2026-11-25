@@ -287,14 +287,22 @@ def call_kind(r: dict) -> str:
     return "rag_summary" if "system" in roles else "rag_keyword"
 
 
-def cost_of(r: dict, prices: dict) -> float | None:
-    model = r.get("response_model") or r.get("model")
+def price_cost(model: str | None, usage: dict, prices: dict, missing: set) -> float | None:
+    """캐시된 입력 토큰은 캐시 단가로 계산한다. 가격표에 없는 모델은 None을 돌려주고 missing에 남긴다."""
     model = prices["aliases"].get(model, model)
     p = prices["models"].get(model)
-    u = r.get("usage") or {}
-    if not p or u.get("prompt_tokens") is None:
+    if usage.get("prompt_tokens") is None:
         return None
-    return ((u.get("prompt_tokens") or 0) * p["input"] + (u.get("completion_tokens") or 0) * p["output"]) / 1e6
+    if not p:
+        missing.add(str(model))
+        return None
+    cached = usage.get("cached_tokens") or 0
+    fresh = (usage.get("prompt_tokens") or 0) - cached
+    return (fresh * p["input"] + cached * p.get("cached_input", p["input"]) + (usage.get("completion_tokens") or 0) * p["output"]) / 1e6
+
+
+def cost_of(r: dict, prices: dict, missing: set) -> float | None:
+    return price_cost(r.get("response_model") or r.get("model"), r.get("usage") or {}, prices, missing)
 
 
 def attribute(calls: list[dict], cases: list[dict]) -> dict:
@@ -376,12 +384,13 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["llm_calls"] = len(calls)
     s["llm_calls_unattributed"] = len(by_case["_unattributed"])
     kinds = {}
+    missing_prices: set = set()
     for r in calls:
         k = kinds.setdefault(call_kind(r), {"calls": 0, "latency": [], "out": 0, "reasoning": 0, "cost": 0.0})
         u = r.get("usage") or {}
         k["calls"] += 1; k["latency"].append(r.get("latency_s") or 0)
         k["out"] += u.get("completion_tokens") or 0; k["reasoning"] += u.get("reasoning_tokens") or 0
-        k["cost"] += cost_of(r, prices) or 0
+        k["cost"] += cost_of(r, prices, missing_prices) or 0
     s["M11_by_kind"] = {k: {"calls": v["calls"],
                             "p50_s": round(statistics.median(v["latency"]), 1),
                             "p95_s": p95(v["latency"]),
@@ -393,12 +402,10 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["M11_turn_latency_p95_s"] = p95(send_lat)
     judge_cost = 0.0
     for r in judged:
-        jm = prices["aliases"].get(r["judge"]["model"], r["judge"]["model"])
-        p = prices["models"].get(jm)
-        if p:
-            u = r["judge"]["usage"]
-            judge_cost += ((u.get("prompt_tokens") or 0) * p["input"] + (u.get("completion_tokens") or 0) * p["output"]) / 1e6
+        judge_cost += price_cost(r["judge"]["model"], r["judge"]["usage"], prices, missing_prices) or 0
     s["judge_cost_usd"] = round(judge_cost, 4)
+    s["judge_failed"] = sum(1 for r in convo if r.get("draft") and "judge" not in r)
+    s["models_missing_price"] = sorted(missing_prices)  # 비어 있지 않으면 비용이 과소 계산된 것이다
     return s
 
 
