@@ -1,0 +1,77 @@
+# 로컬 개발용 실행 구성
+#
+#   1) server/.env, ai/.env 를 각 폴더의 .env.example 로 만든다
+#   2) docker compose up -d --build
+#   3) 프론트는 호스트에서 실행: cd web && pnpm install && pnpm dev
+#
+# 운영 배포 구성은 deploy/docker-compose.prod.yml 에 따로 있다.
+
+name: baro-dev
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: baro
+      POSTGRES_PASSWORD: baro
+      POSTGRES_DB: baro_db
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baro -d baro_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ai:
+    build: ./ai
+    env_file: ./ai/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      # 로컬에 있는 판례 벡터 DB를 그대로 쓴다. 있으면 S3 다운로드를 건너뛴다.
+      - ./ai/data/rag_db:/app/data/rag_db
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  server:
+    build: ./server
+    env_file: ./server/.env
+    environment:
+      DATABASE_URL: postgresql://baro:baro@postgres:5432/baro_db
+      BARO_AI_URL: http://ai:8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  postgres_data:

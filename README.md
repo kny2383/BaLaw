@@ -14,6 +14,25 @@ AI 고소장 작성 도우미 서비스. 사용자가 사건을 일상어로 설
 
 원래 4개 레포의 커밋 기록은 각 폴더에 그대로 보존했다. 레포를 합친 이유와 진행 순서는 `docs/`를 참고한다.
 
+## 로컬 실행
+
+```bash
+cp server/.env.example server/.env   # 값 채우기
+cp ai/.env.example ai/.env           # 값 채우기 (OPENAI_API_KEY 필수)
+docker compose up -d --build         # PostgreSQL, Redis, AI, 서버
+
+cd web && cp .env.example .env && pnpm install && pnpm dev   # 프론트
+```
+
+| 서비스 | 주소 |
+|---|---|
+| 서버 API | http://localhost:8000 (헬스 체크 `/health`) |
+| AI | http://localhost:8001 |
+| 프론트 | http://localhost:5173 |
+| PostgreSQL | localhost:5432 (baro / baro) |
+
+종료는 `docker compose down`, DB까지 지우려면 `docker compose down -v`.
+
 ## 로컬 전용 데이터
 
 대용량 데이터는 레포에 넣지 않는다. AI 코드가 읽는 위치에 직접 두고 git에서 제외한다.
