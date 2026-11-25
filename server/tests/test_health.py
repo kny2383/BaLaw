@@ -1,0 +1,15 @@
+def test_health(client):
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "healthy"}
+
+
+def test_cors_allows_configured_origin(client):
+    r = client.options("/health", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"})
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_cors_rejects_unknown_origin(client):
+    r = client.options("/health", headers={"Origin": "https://evil.example.com", "Access-Control-Request-Method": "GET"})
+    assert "access-control-allow-origin" not in r.headers
+

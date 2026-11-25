@@ -22,6 +22,7 @@ AI 고소장 작성 도우미 서비스. 사용자가 사건을 일상어로 설
   | 검사 | 대상 |
   |---|---|
   | Python 문법 | `server/`, `ai/`, `eval/` |
+  | 서버 린트(ruff)·테스트(pytest) | `server/` |
   | 평가 사례 형식·정답 잠금 | `eval/` (`python eval/check_cases.py`) |
   | 서버·AI 이미지 빌드 | `server/`, `ai/` |
   | 프론트 린트·빌드 | `web/` |

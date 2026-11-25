@@ -1,10 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.models import SecuritySchemeType, HTTPBearer, HTTPBase
-from fastapi.security import HTTPBearer as HTTPBearerSecurity
 from contextlib import asynccontextmanager
 from app.api import test, auth, complaint
-from app.models import user, complaint as complaint_model, chat_message
+from app.models import user, complaint as complaint_model, chat_message  # noqa: F401  create_all에 테이블을 등록하려고 불러온다
 from app.database import engine, Base
 from app.services.scheduler_service import scheduler_service
 

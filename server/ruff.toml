@@ -1,0 +1,7 @@
+# 서버 린트 설정. 처음에는 확실한 오류(문법 오류, 정의 안 된 이름, 안 쓰는 import 등)만 본다.
+# 형식 규칙은 코드 전체가 바뀌므로 나중에 따로 켠다.
+target-version = "py312"
+extend-exclude = ["alembic/versions"]  # 이미 적용된 마이그레이션 기록은 고치지 않는다
+
+[lint]
+select = ["E9", "F"]

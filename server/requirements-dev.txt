@@ -1,0 +1,4 @@
+# 테스트·린트 도구. 운영 이미지에는 넣지 않는다.
+-c requirements.lock
+pytest==8.3.4
+ruff==0.17.6
