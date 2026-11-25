@@ -21,7 +21,7 @@ AI 고소장 작성 도우미 서비스. 사용자가 사건을 일상어로 설
 | 경로 | 내용 | 없을 때 |
 |---|---|---|
 | `ai/data/rag_db/` | 판례 벡터 DB (ChromaDB, 약 640MB) | `RAG_DB_URL`의 S3 주소에서 내려받거나 `ai/scripts/generate_embeddings.py`로 다시 생성 |
-| `ai/crawl/prec_labeled_final.jsonl` | 죄명 라벨이 붙은 형사 판례 11,396건 (약 380MB) | `ai/crawl/` 수집 스크립트로 다시 생성 |
+| `ai/crawl/prec_labeled_final.jsonl` | 죄명 라벨이 붙은 형사 판례 11,392건 (약 370MB). 벡터 DB에는 11,393건이 들어 있다 | `ai/crawl/` 수집 스크립트로 다시 생성 |
 | `local-data/` | 그 밖의 로컬 사본 | - |
 
 각 폴더의 `.env`는 `.env.example`을 복사해 만든다. `.env`는 커밋하지 않는다.
