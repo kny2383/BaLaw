@@ -201,7 +201,8 @@ def confirm(state: ChatState) -> dict:
                                "unsupported": denied, "confirmed": review["confirmed"] + kept}}
     if kept:
         # 사용자가 사실이라고 답한 내용은 사용자의 말이므로 대화 기록에 남긴다. 다시 검증할 때 근거가 된다.
-        said = CONFIRM_PREFIX + " / ".join(c["quote"] for c in kept)
+        # 구절만으로는 뜻이 정해지지 않으므로 구절이 든 문장을 적는다.
+        said = CONFIRM_PREFIX + " / ".join(c.get("sentence") or c["quote"] for c in kept)
         update["history"] = state["history"] + [{"role": "user", "content": said}]
     return update
 

@@ -228,6 +228,7 @@ def test_quote_not_in_the_draft_is_ignored(fake, monkeypatch):
 
 # ---------- 사용자 확인 (interrupt) ----------
 OTHER = "금원을"  # 가짜 초안에 들어 있는 다른 표현
+SENTENCE = "고소인은 피고소인에게 금원을 송금하였습니다."  # BAD와 OTHER가 든 초안의 문장
 
 
 def _compose_with_confirm(fake, monkeypatch, found, max_rewrites=1, confirm_max=5):
@@ -319,7 +320,7 @@ def test_second_verify_uses_the_confirmation(fake, monkeypatch):
     out = graph.invoke(Command(resume=[True, False]), CONFIG)
     assert _kinds(fake) == ["compose", "verify", "rewrite", "verify"]
     prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
-    assert f"사실이 맞습니다: {BAD}" in prompt
+    assert f"사실이 맞습니다: {SENTENCE}" in prompt  # 구절이 아니라 구절이 든 문장
     assert out["review"]["status"] == "rewritten" and out["review"]["rechecked"] is True
 
 
@@ -336,3 +337,24 @@ def test_confirm_limit_must_be_at_least_one(monkeypatch):
         cfg._at_least_one("DRAFT_CONFIRM_MAX", 5)
     monkeypatch.setenv("DRAFT_CONFIRM_MAX", "")
     assert cfg._at_least_one("DRAFT_CONFIRM_MAX", 5) == 5
+
+
+def test_claim_carries_the_sentence_it_sits_in(fake, monkeypatch):
+    """검증은 근거 없는 구절만 인용한다. 사용자에게 물을 때 보여 줄 문장은 초안에서 찾아 붙인다."""
+    _, _, out = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    assert out["review"]["unsupported"] == [{"quote": BAD, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
+
+
+def test_rewrite_is_told_which_sentence_the_phrase_is_in(fake, monkeypatch):
+    fake.verify_results = [[BAD]]
+    _compose(fake, monkeypatch)
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f'- "{BAD}" — 문장: "{SENTENCE}"' in prompt
+
+
+def test_whole_sentence_quote_is_not_repeated(fake, monkeypatch):
+    fake.verify_results = [[SENTENCE]]
+    out = _compose(fake, monkeypatch)
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f'- "{SENTENCE}" (' in prompt and "— 문장:" not in prompt
+    assert out["review"]["removed"][0]["sentence"] == SENTENCE

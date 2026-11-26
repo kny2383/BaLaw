@@ -154,7 +154,8 @@ def judge_transcript(r: dict) -> str:
 
 
 def confirmed_quotes(r: dict) -> list[str]:
-    return [c["quote"] for rnd in r.get("confirm") or [] for c, yes in zip(rnd["claims"], rnd["answers"]) if yes]
+    return [c.get("sentence") or c["quote"]
+            for rnd in r.get("confirm") or [] for c, yes in zip(rnd["claims"], rnd["answers"]) if yes]
 
 
 def user_knowledge(case: dict) -> str:
@@ -164,12 +165,21 @@ def user_knowledge(case: dict) -> str:
     return "\n".join(lines)
 
 
+def claim_text(claim: dict) -> str:
+    """모의 사용자에게 보여 줄 표현. 화면처럼 구절과 그 구절이 든 문장을 함께 보여 준다."""
+    sentence = claim.get("sentence") or claim["quote"]
+    if sentence == claim["quote"]:
+        return claim["quote"]
+    return f"\"{claim['quote']}\" (이 구절이 든 문장: {sentence})"
+
+
 def confirm_prompt(case: dict, claims: list[dict], draft: str) -> str:
     return ("[내가 겪은 일]\n" + user_knowledge(case) +
             "\n\n[고소장 초안] (표현이 놓인 문맥을 보는 용도다. 초안에 적혀 있다는 것은 근거가 아니다)\n" + draft +
-            "\n\n[초안의 표현]\n" + "\n".join(f"{i + 1}. {c['quote']}" for i, c in enumerate(claims)) +
+            "\n\n[초안의 표현]\n" + "\n".join(f"{i + 1}. {claim_text(c)}" for i, c in enumerate(claims)) +
             "\n\n[답하는 방법]\n"
             "표현마다 n(번호), true, basis(근거가 된 내 말, 없으면 빈 문자열)를 적는다. 번호 순서대로 모두 답한다.\n"
+            "구절과 문장이 함께 적힌 표현은 문장 전체가 아니라 그 구절이 말하는 사실만 본다.\n"
             "true: 그 표현의 사실이 [내가 겪은 일]에 있거나 거기서 바로 따라 나온다.\n"
             "false: [내가 겪은 일]에 없거나 반대된다. 내가 모른다고 한 것을 있다 또는 없다로 단정한 표현, "
             "내가 말하지 않은 피해의 정도·감정·세부가 들어간 표현은 false다. 그럴듯해 보여도 겪은 일에 없으면 false다.")
