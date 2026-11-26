@@ -115,6 +115,8 @@ const ComplaintWizardPage: React.FC = () => {
   const [claimsToConfirm, setClaimsToConfirm] = useState<DraftClaim[] | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  // 확인을 물은 횟수. 같은 표현을 다시 물어도 창을 새로 만들어 이전 답이 남지 않게 한다
+  const [confirmRound, setConfirmRound] = useState(0);
 
   const handleConfirmSubmit = async (answers: boolean[]) => {
     if (!complaintId) return;
@@ -125,6 +127,7 @@ const ComplaintWizardPage: React.FC = () => {
       if (res.to_confirm.length > 0) {
         // 고쳐 쓴 초안에서 다시 확인할 표현이 나왔다
         setClaimsToConfirm(res.to_confirm);
+        setConfirmRound((n) => n + 1);
         return;
       }
       setGeneratedComplaint(res.generated_complaint);
@@ -285,6 +288,7 @@ const ComplaintWizardPage: React.FC = () => {
           // 확인이 끝나야 초안이 완성된다. 미리보기로 넘어가지 않고 먼저 묻는다.
           setConfirmError(null);
           setClaimsToConfirm(res.to_confirm);
+          setConfirmRound((n) => n + 1);
           return;
         }
 
@@ -656,12 +660,12 @@ const ComplaintWizardPage: React.FC = () => {
         <GeneratingModal open={showGeneratingModal} />
         {claimsToConfirm && (
           <DraftConfirmModal
-            // 다시 묻는 경우 이전 답이 남지 않게 새로 만든다
-            key={claimsToConfirm.map((c) => c.quote).join('|')}
+            key={confirmRound}
             claims={claimsToConfirm}
             isSubmitting={isConfirming}
             errorMessage={confirmError}
             onSubmit={handleConfirmSubmit}
+            onClose={() => setClaimsToConfirm(null)}
           />
         )}
       </main>

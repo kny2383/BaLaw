@@ -9,6 +9,8 @@ type DraftConfirmModalProps = {
   isSubmitting: boolean;
   errorMessage: string | null;
   onSubmit: (answers: boolean[]) => void;
+  /** 답하지 않고 닫는다. 초안은 완성되지 않으며, 다시 생성을 요청하면 새로 작성한다. */
+  onClose: () => void;
 };
 
 /**
@@ -20,6 +22,7 @@ const DraftConfirmModal: React.FC<DraftConfirmModalProps> = ({
   isSubmitting,
   errorMessage,
   onSubmit,
+  onClose,
 }) => {
   const [answers, setAnswers] = useState<(boolean | null)[]>(() => claims.map(() => null));
 
@@ -116,6 +119,14 @@ const DraftConfirmModal: React.FC<DraftConfirmModalProps> = ({
           >
             {isSubmitting ? '초안을 정리하고 있어요' : '답변 보내기'}
           </Button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="text-detail-regular mt-3 w-full text-neutral-500 transition-colors hover:text-neutral-700 disabled:opacity-60"
+          >
+            나중에 답하기 (대화 화면으로 돌아가요. 초안은 아직 완성되지 않아요)
+          </button>
         </div>
       </div>
     </div>
