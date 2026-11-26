@@ -51,7 +51,12 @@ def main() -> int:
     ap.add_argument("--only", nargs="*")
     args = ap.parse_args()
 
-    from flow.chat_graph import rewrite, route_after_verify, verify  # 서비스의 노드를 그대로 쓴다
+    from cfg import settings
+    from flow.chat_graph import rewrite, route_after_rewrite, route_after_verify, verify  # 서비스의 노드를 그대로 쓴다
+
+    if settings.DRAFT_MAX_REWRITES < 1:
+        raise SystemExit("DRAFT_MAX_REWRITES가 0이라 검증하지 않는다. 1 이상으로 두고 실행한다.")
+    print(f"재작성 상한 {settings.DRAFT_MAX_REWRITES}", flush=True)
 
     src_dir = ROOT / "runs" / args.src / "cases"
     out_dir = ROOT / "runs" / args.run_id / "cases"
@@ -59,7 +64,7 @@ def main() -> int:
     proxy_control({"run_id": args.run_id, "case_id": ""})
     failed: list[str] = []
     try:
-        run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify)
+        run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify, route_after_rewrite)
     finally:
         proxy_control({"run_id": "", "case_id": ""})  # 중간에 멈춰도 다음 호출이 이 실행 이름으로 기록되지 않게 한다
     if failed:
@@ -68,7 +73,7 @@ def main() -> int:
     return 0
 
 
-def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify) -> None:
+def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify, route_after_rewrite) -> None:
     for f in sorted(src_dir.glob("*.json")):
         r = json.loads(f.read_text(encoding="utf-8"))
         if args.only and r["id"] not in args.only:
@@ -81,12 +86,15 @@ def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify) -> 
             continue
         proxy_control({"case_id": r["id"]})
         state = {"history": history_of(r), "draft": {k: body[k] for k in ("offense", "title", "sections")},
-                 "review": {"status": "pending", "rewrites": 0, "unsupported": [], "removed": []}}
+                 "review": {"status": "pending", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}}
         t0 = time.time()
         state.update(verify(state))
+        # 서비스 그래프와 같은 분기를 따른다 (반복 상한은 DRAFT_MAX_REWRITES).
         while route_after_verify(state) == "rewrite":
             state.update(rewrite(state))
-            break  # 상한 1과 같은 흐름: 고친 뒤 다시 검증하지 않는다
+            if route_after_rewrite(state) != "verify":
+                break
+            state.update(verify(state))
         sections = state["draft"]["sections"]
         r["judge_before"] = r.pop("judge", None)
         r["draft_before"] = r["draft"]

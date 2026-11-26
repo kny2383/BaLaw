@@ -222,6 +222,7 @@ def chat_compose(req: ComposeRequest):
     prune_session(req.session_id)
     # verification.status: passed(근거 없는 표현 없음) | rewritten(고쳐 씀) | flagged(남아 있음)
     #                      | unverified(검증 호출 실패) | rewrite_failed | off
+    # verification.rechecked: 고쳐 쓴 초안을 다시 검증했는가. 기본 상한(1)에서는 다시 검증하지 않으므로 False다.
     return {**out["draft"], "verification": out["review"]}
 
 

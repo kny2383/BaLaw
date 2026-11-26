@@ -72,7 +72,7 @@ LangGraph로 구현한다.
 - **반복 상한**: `DRAFT_MAX_REWRITES`(기본 1). 상한까지 고쳤으면 다시 검증하지 않고 끝낸다. 검증 호출 한 번이 응답 시간과 비용에 그대로 더해지기 때문이다. 0이면 검증을 끄고 이전 동작과 같다.
 - **확인 대상이 초안인 이유**: 지어낸 사실의 73%가 작성 단계에서 생긴다 (`eval/results/m1-origin-dev10.md`).
 - **실패 처리**: 검증 호출이 실패하면 초안은 그대로 두고 `unverified`로, 재작성 결과를 쓸 수 없으면 `rewrite_failed`로 응답에 남긴다. 검증된 초안처럼 돌려주지 않는다.
-- **응답**: `/chat/compose` 응답에 `verification`(`status`, `rewrites`, `unsupported`, `removed`)이 붙는다. 사용자 확인 단계는 이 목록을 사용자에게 보여 주는 데서 시작한다.
+- **응답**: `/chat/compose` 응답에 `verification`(`status`, `rewrites`, `rechecked`, `unsupported`, `removed`)이 붙는다. 기본 상한에서는 고쳐 쓴 초안을 다시 검증하지 않으므로 `rewritten`이어도 `rechecked`는 false다. 고쳐 쓴 초안이 검증을 통과했다는 뜻이 아니다. 사용자 확인 단계는 이 목록을 사용자에게 보여 주는 데서 시작한다.
 - **치르는 비용**: 작성 요청마다 LLM 호출이 1~2회 늘어난다. 검증 호출에는 대화 원문이 들어간다 (정보 추출 호출과 같은 범위). 식별정보 치환(S05)을 넣을 때 이 호출도 함께 덮어야 한다.
 
 ## 결정 0002와의 관계

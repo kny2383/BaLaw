@@ -174,7 +174,8 @@ def test_compose_returns_sections(client):
     sections = body["sections"]
     assert set(sections) == {"criminal_facts", "accusation_reason"}
     assert all(isinstance(v, str) and v.strip() for v in sections.values())
-    assert body["verification"] == {"status": "passed", "rewrites": 0, "unsupported": [], "removed": []}
+    assert body["verification"] == {"status": "passed", "rewrites": 0, "rechecked": False,
+                                    "unsupported": [], "removed": []}
 
 
 def test_compose_reports_what_was_rewritten(client, fake):

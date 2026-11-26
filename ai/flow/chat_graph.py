@@ -124,7 +124,7 @@ def compose(state: ChatState) -> dict:
     draft = compose_complaint(meta=meta, collected=state.get("collected", {}), evidence=[])
     status = "pending" if settings.DRAFT_MAX_REWRITES > 0 else "off"
     return {"offense": offense, "draft": draft,
-            "review": {"status": status, "rewrites": 0, "unsupported": [], "removed": []}}
+            "review": {"status": status, "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}}
 
 
 def verify(state: ChatState) -> dict:
@@ -139,8 +139,10 @@ def verify(state: ChatState) -> dict:
         print(f"[VERIFY] 초안 검증 실패 reason={e}")
         return {"review": {**review, "status": "unverified"}}
     if found:
-        return {"review": {**review, "status": "flagged", "unsupported": found}}
-    return {"review": {**review, "status": "rewritten" if review["rewrites"] else "passed", "unsupported": []}}
+        return {"review": {**review, "status": "flagged", "rechecked": bool(review["rewrites"]), "unsupported": found}}
+    if review["rewrites"]:
+        return {"review": {**review, "status": "rewritten", "rechecked": True, "unsupported": []}}
+    return {"review": {**review, "status": "passed", "unsupported": []}}
 
 
 def rewrite(state: ChatState) -> dict:
@@ -152,7 +154,8 @@ def rewrite(state: ChatState) -> dict:
         return {"review": {**review, "status": "rewrite_failed"}}
     return {
         "draft": {**state["draft"], "sections": sections},
-        "review": {"status": "rewritten", "rewrites": review["rewrites"] + 1,
+        # 고쳐 쓴 초안은 아직 다시 검증하지 않았다. 다시 검증하면 verify가 rechecked를 True로 바꾼다.
+        "review": {"status": "rewritten", "rewrites": review["rewrites"] + 1, "rechecked": False,
                    "unsupported": [], "removed": review["removed"] + review["unsupported"]},
     }
 

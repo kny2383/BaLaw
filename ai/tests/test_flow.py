@@ -156,7 +156,7 @@ def test_graph_has_verify_and_rewrite_nodes():
 def test_clean_draft_is_not_rewritten(fake, monkeypatch):
     out = _compose(fake, monkeypatch)
     assert _kinds(fake) == ["compose", "verify"]
-    assert out["review"] == {"status": "passed", "rewrites": 0, "unsupported": [], "removed": []}
+    assert out["review"] == {"status": "passed", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}
     assert BAD in out["draft"]["sections"]["criminal_facts"]
 
 
@@ -165,6 +165,7 @@ def test_unsupported_claim_is_rewritten_once(fake, monkeypatch):
     out = _compose(fake, monkeypatch)
     assert _kinds(fake) == ["compose", "verify", "rewrite"]
     assert out["review"]["status"] == "rewritten" and out["review"]["rewrites"] == 1
+    assert out["review"]["rechecked"] is False  # 상한 1에서는 고쳐 쓴 초안을 다시 검증하지 않는다
     assert [c["quote"] for c in out["review"]["removed"]] == [BAD]
     assert BAD not in out["draft"]["sections"]["criminal_facts"]
     # 재작성 요청에는 지적된 표현과 초안이 들어간다.
@@ -184,6 +185,7 @@ def test_rewrite_loop_stops_at_the_limit(fake, monkeypatch):
     out = _compose(fake, monkeypatch, max_rewrites=2)
     assert _kinds(fake) == ["compose", "verify", "rewrite", "verify", "rewrite"]
     assert out["review"]["rewrites"] == 2
+    assert out["review"]["rechecked"] is False  # 마지막으로 고쳐 쓴 초안은 다시 검증하지 않았다
 
 
 def test_second_verify_can_pass(fake, monkeypatch):
@@ -191,6 +193,7 @@ def test_second_verify_can_pass(fake, monkeypatch):
     out = _compose(fake, monkeypatch, max_rewrites=2)
     assert _kinds(fake) == ["compose", "verify", "rewrite", "verify"]
     assert out["review"]["status"] == "rewritten" and out["review"]["rewrites"] == 1
+    assert out["review"]["rechecked"] is True
 
 
 def test_verification_can_be_turned_off(fake, monkeypatch):

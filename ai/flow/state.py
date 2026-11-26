@@ -23,7 +23,7 @@ class ChatState(TypedDict, total=False):
     request: dict                # {"action": "init" | "message" | "compose", ...}
     result: dict                 # {"reply": str, "complete": bool, "caution": bool}
     draft: dict                  # 작성 결과 {"offense", "title", "sections"}
-    review: dict                 # 초안 검증 {"status", "rewrites", "unsupported": [{"quote", "reason"}], "removed": [...]}
+    review: dict                 # 초안 검증 {"status", "rewrites", "rechecked", "unsupported": [{"quote", "reason"}], "removed": [...]}
 
 
 class RagState(TypedDict, total=False):
