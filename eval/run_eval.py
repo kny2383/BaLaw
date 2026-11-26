@@ -154,13 +154,13 @@ def judge_transcript(r: dict) -> str:
 
 
 def confirmed_quotes(r: dict) -> list[str]:
-    # 서비스가 대화 기록에 남기는 것과 같은 규칙: 같은 문장에 사실이 아니라고 한 구절이 있으면 구절만 적는다.
+    # 서비스가 대화 기록에 남기는 것과 같은 형식: 확인한 범위는 구절이고, 문장은 뜻을 정하는 문맥이다.
     out = []
     for rnd in r.get("confirm") or []:
-        pairs = list(zip(rnd["claims"], rnd["answers"]))
-        denied = {c.get("sentence") for c, yes in pairs if not yes}
-        out += [c["quote"] if c.get("sentence") in denied else (c.get("sentence") or c["quote"])
-                for c, yes in pairs if yes]
+        for c, yes in zip(rnd["claims"], rnd["answers"]):
+            if yes:
+                sentence = c.get("sentence") or c["quote"]
+                out.append(f'"{c["quote"]}"' if sentence == c["quote"] else f'"{sentence}"에서 "{c["quote"]}" 부분')
     return out
 
 

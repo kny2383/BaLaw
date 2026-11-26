@@ -65,11 +65,14 @@ def format_draft(sections: dict) -> str:
 
 
 def sentence_of(quote: str, draft_text: str) -> str:
-    """인용이 들어 있는 초안의 문장(한 줄). 사용자에게 물을 때 구절이 놓인 문맥으로 보여 준다."""
-    for line in draft_text.splitlines():
-        if quote in line:
-            return line.strip().lstrip("○").strip()
-    return quote  # 여러 줄에 걸친 인용
+    """인용이 들어 있는 초안의 문장(한 줄). 사용자에게 물을 때 구절이 놓인 문맥으로 보여 준다.
+
+    구절이 여러 줄에 걸치거나 여러 문장에 나오면 어느 문장인지 정할 수 없으므로 구절만 돌려준다.
+    """
+    lines = [line for line in draft_text.splitlines() if quote in line]
+    if len(lines) != 1:
+        return quote
+    return lines[0].strip().lstrip("○").strip()
 
 
 def verify_draft(history: list[dict], sections: dict) -> list[dict]:

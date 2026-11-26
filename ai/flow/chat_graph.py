@@ -175,6 +175,18 @@ def rewrite(state: ChatState) -> dict:
 CONFIRM_PREFIX = "고소장 초안의 다음 내용은 사실이 맞습니다: "
 
 
+def confirmed_text(claim: dict) -> str:
+    """사용자가 사실이라고 답한 내용을 대화 기록에 남길 글.
+
+    사용자가 확인한 것은 구절이다. 구절만으로는 뜻이 정해지지 않아 문장을 함께 적되,
+    확인한 범위가 그 구절이라는 것을 밝힌다. 문장의 나머지까지 사용자의 말로 만들지 않기 위해서다.
+    """
+    quote, sentence = claim["quote"], claim.get("sentence") or claim["quote"]
+    if sentence == quote:
+        return f'"{quote}"'
+    return f'"{sentence}"에서 "{quote}" 부분'
+
+
 def claims_to_confirm(review: dict) -> list[dict]:
     """사용자에게 물을 표현. 한 번에 묻는 개수에 상한을 두고, 넘는 것은 묻지 않고 고친다."""
     return review["unsupported"][:settings.DRAFT_CONFIRM_MAX]
@@ -201,12 +213,8 @@ def confirm(state: ChatState) -> dict:
                                "unsupported": denied, "confirmed": review["confirmed"] + kept}}
     if kept:
         # 사용자가 사실이라고 답한 내용은 사용자의 말이므로 대화 기록에 남긴다. 다시 검증할 때 근거가 된다.
-        # 구절만으로는 뜻이 정해지지 않으므로 구절이 든 문장을 적는다. 다만 같은 문장에 사실이 아니라고 했거나
-        # 묻지 않은 구절이 있으면 구절만 적는다. 문장을 적으면 확인받지 않은 내용까지 사용자의 말이 된다.
-        unconfirmed = {c.get("sentence") for c in denied}
-        texts = [c["quote"] if c.get("sentence") in unconfirmed else (c.get("sentence") or c["quote"]) for c in kept]
-        said = CONFIRM_PREFIX + " / ".join(dict.fromkeys(texts))  # 같은 문장의 구절이 여럿이면 문장은 한 번만
-        update["history"] = state["history"] + [{"role": "user", "content": said}]
+        update["history"] = state["history"] + [{"role": "user", "content": CONFIRM_PREFIX + " / ".join(
+            confirmed_text(c) for c in kept)}]
     return update
 
 
