@@ -236,6 +236,102 @@ def test_generate_works_without_verification_field(client, db_session, user_toke
     assert r.status_code == 200 and r.json()["verification"] is None
 
 
+# ---------- 고소장 생성: 사용자 확인 ----------
+WAITING = {"status": "awaiting_confirmation", "rewrites": 0, "rechecked": False, "removed": [], "confirmed": [],
+           "unsupported": [{"quote": "극심한 고통", "reason": "대화에 없는 내용"}],
+           "to_confirm": [{"quote": "극심한 고통", "reason": "대화에 없는 내용"}]}
+
+
+def _confirm(client, user_tokens, monkeypatch, cid, answers, result=None, error=None):
+    from app.api import complaint as complaint_api
+    calls = []
+
+    async def fake_confirm(session_id, got):
+        calls.append((session_id, got))
+        if error:
+            raise RuntimeError(error)
+        return result
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_compose_confirm", fake_confirm)
+    r = client.post(f"/api/complaints/{cid}/generate/confirm", json={"answers": answers}, headers=auth_header(user_tokens))
+    return r, calls
+
+
+def _complaint(db_session, cid) -> Complaint:
+    db_session.expire_all()
+    return db_session.query(Complaint).filter(Complaint.id == cid).one()
+
+
+def test_generate_waiting_for_confirmation_saves_nothing(client, db_session, user_tokens, monkeypatch):
+    r = _generate(client, db_session, user_tokens, monkeypatch, WAITING)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "awaiting_confirmation"
+    assert [c["quote"] for c in body["verification"]["to_confirm"]] == ["극심한 고통"]
+    saved = _complaint(db_session, body["complaint_id"])
+    assert saved.status != "completed" and not saved.generated_complaint_encrypted and not saved.crime_fact
+
+
+def test_confirm_finishes_the_complaint(client, db_session, user_tokens, monkeypatch):
+    cid = _generate(client, db_session, user_tokens, monkeypatch, WAITING).json()["complaint_id"]
+    done = {"sections": {"criminal_facts": "고친 범죄사실", "accusation_reason": "고소이유 본문"},
+            "verification": {"status": "rewritten", "rewrites": 1, "removed": WAITING["to_confirm"]}}
+    r, calls = _confirm(client, user_tokens, monkeypatch, cid, [False], result=done)
+    assert r.status_code == 200 and calls == [("ai-session-1", [False])]
+    assert r.json()["status"] == "completed" and r.json()["criminal_facts"] == "고친 범죄사실"
+    saved = _complaint(db_session, cid)
+    assert saved.status == "completed" and saved.generated_complaint_encrypted
+
+
+def test_confirm_without_a_waiting_draft_is_conflict(client, db_session, user_tokens, monkeypatch):
+    cid = _generate(client, db_session, user_tokens, monkeypatch, WAITING).json()["complaint_id"]
+    for error in ("Baro-AI 서버 오류 (409): 확인을 기다리는 초안이 없습니다.", "Baro-AI 서버 오류 (404): 세션을 찾을 수 없습니다."):
+        r, _ = _confirm(client, user_tokens, monkeypatch, cid, [True], error=error)
+        assert r.status_code == 409
+    assert _complaint(db_session, cid).status != "completed"
+
+
+def test_confirm_reports_ai_failure_without_details(client, db_session, user_tokens, monkeypatch):
+    cid = _generate(client, db_session, user_tokens, monkeypatch, WAITING).json()["complaint_id"]
+    r, _ = _confirm(client, user_tokens, monkeypatch, cid, [True], error="Baro-AI 서버에 연결할 수 없습니다. 내부주소")
+    assert r.status_code == 503 and "내부주소" not in r.text
+    r, _ = _confirm(client, user_tokens, monkeypatch, cid, [], error="Baro-AI 서버 오류 (400): 답은 1개여야 합니다.")
+    assert r.status_code == 400
+
+
+def test_other_user_cannot_confirm(client, db_session, user_tokens, monkeypatch):
+    cid = _generate(client, db_session, user_tokens, monkeypatch, WAITING).json()["complaint_id"]
+    register(client, email="other2@example.com")
+    other = login(client, email="other2@example.com")
+    r, calls = _confirm(client, other, monkeypatch, cid, [True], result={})
+    assert r.status_code == 404 and calls == []
+
+
+def test_ai_client_sends_confirmation_answers(monkeypatch):
+    import asyncio
+    import json
+
+    import httpx
+
+    from app.services.ai_service import BaroAIService
+
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"], seen["body"] = request.url.path, json.loads(request.content)
+        return httpx.Response(409, json={"detail": "확인을 기다리는 초안이 없습니다."})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw))
+    service = BaroAIService()
+    try:
+        asyncio.run(service.chat_compose_confirm("sid", [True, False]))
+        raise AssertionError("409는 오류로 올라와야 한다")
+    except RuntimeError as e:
+        assert service.is_no_pending_confirmation_error(e) and not service.is_session_missing_error(e)
+    assert seen == {"path": "/chat/compose/confirm", "body": {"session_id": "sid", "answers": [True, False]}}
+
+
 def test_known_pii_skips_placeholder_names(client, db_session, user_tokens):
     """이름 칸에 '성명불상'처럼 값 대신 적은 말은 넘기지 않는다."""
     from app.api.complaint import known_pii_of

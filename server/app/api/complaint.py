@@ -14,6 +14,7 @@ from app.models.chat_message import ChatMessage
 from app.schemas.complaint import (
     ComplaintCreate, ComplaintResponse, ComplaintStartResponse,
     ComplaintGenerateResponse,
+    ComplaintGenerateConfirmRequest,
     ChatMessageCreate, ChatResponse, ComplainantInfoCreate, AccusedInfoCreate,
     RelatedCasesCreate, EvidenceCreate, ChatInitRequest, ChatInitResponse, RagCase,
     ChatHistoryResponse, ChatRagResponse
@@ -634,61 +635,30 @@ async def get_chat_rag(
         rag_cases=rag_cases
     )
 
-@router.post("/{complaint_id}/generate", response_model=ComplaintGenerateResponse)
-async def generate_complaint(
-    complaint_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """최종 고소장 생성 - Baro-AI로 고소장 작성 (세션 자동 복원 포함)"""
-    complaint = db.query(Complaint).filter(
-        Complaint.id == complaint_id,
-        Complaint.user_id == current_user.id
-    ).first()
 
-    if not complaint:
-        raise HTTPException(status_code=404, detail="고소장을 찾을 수 없습니다")
+def _finish_generation(db: Session, complaint: Complaint, ai_response: dict) -> dict:
+    """AI 서비스의 작성 응답을 저장하고 화면에 돌려줄 값을 만든다.
 
-    if not complaint.ai_session_id:
-        raise HTTPException(status_code=400, detail="AI 세션이 초기화되지 않았습니다")
+    사용자 확인을 기다리는 응답이면 저장하지 않는다. 고치기 전의 초안을 완성본으로 남기지 않기 위해서다.
+    """
+    sections = ai_response.get("sections", {})
+    criminal_facts = sections.get("criminal_facts", "")
+    accusation_reason = sections.get("accusation_reason", "")
+    verification = ai_response.get("verification")
+    if not isinstance(verification, dict):
+        verification = None
 
-    # Baro-AI에 고소장 작성 요청 (세션 복원 로직 포함)
-    try:
-        effective_session_id = complaint.ai_session_id
-        ai_response = await ai_service.chat_compose(effective_session_id)
-        sections = ai_response.get("sections", {})
-        criminal_facts = sections.get("criminal_facts", "")
-        accusation_reason = sections.get("accusation_reason", "")
-    except RuntimeError as e:
-        # 세션을 찾을 수 없는 경우 (AI 서버 재시작 등)
-        if ai_service.is_session_missing_error(e):
-            try:
-                effective_session_id = await restore_ai_session(db=db, complaint=complaint)
-
-                # 복원된 세션으로 고소장 작성 재요청
-                ai_response = await ai_service.chat_compose(effective_session_id)
-                sections = ai_response.get("sections", {})
-                criminal_facts = sections.get("criminal_facts", "")
-                accusation_reason = sections.get("accusation_reason", "")
-            except Exception as restore_error:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"세션 복원 실패: {str(restore_error)}"
-                )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"AI 서비스 연결 실패: {str(e)}"
-            )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI 서비스 연결 실패: {str(e)}"
-        )
+    if verification and verification.get("status") == "awaiting_confirmation":
+        return {
+            "complaint_id": complaint.id,
+            "criminal_facts": criminal_facts,
+            "accusation_reason": accusation_reason,
+            "status": "awaiting_confirmation",
+            "verification": verification,
+        }
 
     # 초안 검증이 끝나지 않았거나 근거 없는 표현이 남았으면 기록하고 응답으로 알린다 (내용은 기록하지 않는다).
-    verification = ai_response.get("verification")
-    if isinstance(verification, dict) and verification.get("status") in ("unverified", "rewrite_failed", "flagged"):
+    if verification and verification.get("status") in ("unverified", "rewrite_failed", "flagged"):
         logger.warning("초안 검증이 완료되지 않음 complaint_id=%s status=%s", complaint.id, verification.get("status"))
 
     # 개별 필드에 암호화하여 저장
@@ -722,8 +692,97 @@ async def generate_complaint(
         "criminal_facts": criminal_facts,
         "accusation_reason": accusation_reason,
         "status": "completed",
-        "verification": verification if isinstance(verification, dict) else None,
+        "verification": verification,
     }
+
+
+@router.post("/{complaint_id}/generate", response_model=ComplaintGenerateResponse)
+async def generate_complaint(
+    complaint_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """최종 고소장 생성 - Baro-AI로 고소장 작성 (세션 자동 복원 포함)"""
+    complaint = db.query(Complaint).filter(
+        Complaint.id == complaint_id,
+        Complaint.user_id == current_user.id
+    ).first()
+
+    if not complaint:
+        raise HTTPException(status_code=404, detail="고소장을 찾을 수 없습니다")
+
+    if not complaint.ai_session_id:
+        raise HTTPException(status_code=400, detail="AI 세션이 초기화되지 않았습니다")
+
+    # Baro-AI에 고소장 작성 요청 (세션 복원 로직 포함)
+    try:
+        effective_session_id = complaint.ai_session_id
+        ai_response = await ai_service.chat_compose(effective_session_id)
+    except RuntimeError as e:
+        # 세션을 찾을 수 없는 경우 (AI 서버 재시작 등)
+        if ai_service.is_session_missing_error(e):
+            try:
+                effective_session_id = await restore_ai_session(db=db, complaint=complaint)
+
+                # 복원된 세션으로 고소장 작성 재요청
+                ai_response = await ai_service.chat_compose(effective_session_id)
+            except Exception as restore_error:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"세션 복원 실패: {str(restore_error)}"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"AI 서비스 연결 실패: {str(e)}"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"AI 서비스 연결 실패: {str(e)}"
+        )
+
+    return _finish_generation(db, complaint, ai_response)
+
+
+@router.post("/{complaint_id}/generate/confirm", response_model=ComplaintGenerateResponse)
+async def confirm_generated_complaint(
+    complaint_id: int,
+    body: ComplaintGenerateConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """확인을 기다리는 초안에 사용자의 답을 보내 고소장을 완성한다."""
+    complaint = db.query(Complaint).filter(
+        Complaint.id == complaint_id,
+        Complaint.user_id == current_user.id
+    ).first()
+
+    if not complaint:
+        raise HTTPException(status_code=404, detail="고소장을 찾을 수 없습니다")
+
+    if not complaint.ai_session_id:
+        raise HTTPException(status_code=400, detail="AI 세션이 초기화되지 않았습니다")
+
+    try:
+        ai_response = await ai_service.chat_compose_confirm(complaint.ai_session_id, body.answers)
+    except RuntimeError as e:
+        # 기다리던 확인이 없어졌다 (다시 작성을 요청했거나 AI 서비스의 세션이 사라짐). 생성부터 다시 해야 한다.
+        if ai_service.is_no_pending_confirmation_error(e) or ai_service.is_session_missing_error(e):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="확인을 기다리는 초안이 없습니다. 고소장 생성을 다시 요청해 주세요."
+            )
+        if "(400)" in str(e):
+            raise HTTPException(status_code=400, detail="답의 개수가 확인을 요청한 표현의 개수와 다릅니다.")
+        logger.warning("확인 답 전달 실패 complaint_id=%s", complaint.id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI 서비스 연결 실패. 잠시 후 다시 시도해 주세요."
+        )
+
+    return _finish_generation(db, complaint, ai_response)
+
 
 @router.get("/{complaint_id}/download")
 def download_complaint_docx(

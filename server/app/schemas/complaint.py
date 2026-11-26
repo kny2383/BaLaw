@@ -214,4 +214,11 @@ class ComplaintGenerateResponse(BaseModel):
     status: str
     # 초안 검증 결과 (AI 서비스가 돌려준 그대로). status가 unverified, rewrite_failed, flagged이면
     # 근거 없는 표현이 남아 있을 수 있다. 예전 AI 서비스 응답에는 없다.
+    # status가 awaiting_confirmation이면 초안은 아직 저장되지 않았다. verification.to_confirm의 표현마다
+    # 사실인지 답을 받아 /generate/confirm으로 보내야 완성된다. 이때 본문은 고치기 전의 초안이다.
     verification: Optional[dict] = None
+
+
+class ComplaintGenerateConfirmRequest(BaseModel):
+    # verification.to_confirm과 같은 순서. true = 사용자가 겪은 사실이 맞다.
+    answers: List[bool]
