@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 import json
 from pathlib import Path
 import chromadb
@@ -108,8 +109,12 @@ def is_crime(name: str, keyword: str) -> bool:
     """죄명이 찾는 죄목인가. '상습사기', '업무상횡령'처럼 앞에 말이 붙은 것도 같은 죄목으로 본다.
 
     글자가 들어 있는지로만 보면 '군사기밀보호법위반'이 '사기'로 잡힌다.
+    라벨에는 '사기{인정된죄명:...}'처럼 괄호로 덧붙인 말이나, 가운뎃점으로 이은 죄명('...법률위반·사기')도 있다.
+    괄호 뒤는 떼고, 가운뎃점으로 나눈 조각도 따로 본다.
     """
-    return name.replace(" ", "").endswith(keyword.replace(" ", ""))
+    key = keyword.replace(" ", "")
+    whole = re.split(r"[\[{(（]", name, maxsplit=1)[0].replace(" ", "")
+    return any(part.endswith(key) for part in [whole] + whole.split("·") if part)
 
 
 def search_similar_cases_filtered(query_text: str, keyword: str, k: int = 3) -> list[dict]:

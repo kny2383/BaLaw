@@ -25,6 +25,11 @@ def test_crime_name_is_matched_as_a_name_not_as_letters():
     assert rag.is_crime("업무상횡령", "횡령") and rag.is_crime("상관 명예훼손", "명예훼손")
     assert not rag.is_crime("군사기밀보호법위반", "사기"), "글자만 보면 '사기'가 들어 있다"
     assert not rag.is_crime("조세를 포탈한 행위는 사기나 그 밖의 부정한 행위에 해당함", "사기")
+    # 라벨에 실제로 있는 형태: 괄호로 덧붙인 말, 가운뎃점으로 이은 죄명
+    assert rag.is_crime("사기{인정된죄명:특정경제범죄가중처벌등에관한법률위반}", "사기") and rag.is_crime("사기[피고인1", "사기")
+    assert rag.is_crime("특정경제범죄가중처벌등에관한법률위반·사기", "사기")
+    assert rag.is_crime("아동·청소년의성보호에관한법률위반", "아동·청소년의성보호에관한법률위반")
+    assert not rag.is_crime("보험사기방지특별법위반", "사기"), "다른 법 위반이다. 의도한 제외"
 
 
 def test_cases_about_only_that_crime_come_first(monkeypatch):
