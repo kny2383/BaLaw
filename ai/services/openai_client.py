@@ -1,5 +1,6 @@
 # services/openai_client.py
-from typing import Optional
+from typing import Optional, Type
+from pydantic import BaseModel
 from openai import OpenAI
 from cfg import settings
 
@@ -56,3 +57,31 @@ def respond(model: str, system: str, user: str, reasoning_effort: Optional[str] 
     except Exception as e:
         print(f"Error during OpenAI API call: {e}")
         return ""
+
+
+def respond_parsed(model: str, system: str, user: str, schema: Type[BaseModel],
+                   reasoning_effort: Optional[str] = None) -> Optional[BaseModel]:
+    """스키마에 맞는 구조화 출력을 받아 검증된 객체로 돌려준다. 실패하면 None.
+
+    실패: 호출 오류, 모델의 거부, 출력이 잘려 스키마 검증을 통과하지 못한 경우.
+    """
+    c = client()
+    options = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
+
+    try:
+        resp = c.chat.completions.parse(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            response_format=schema,
+            **options,
+        )
+        message = resp.choices[0].message
+        if message.parsed is None:
+            print(f"Structured output missing (refusal={getattr(message, 'refusal', None)!r})")
+        return message.parsed
+    except Exception as e:
+        print(f"Error during OpenAI structured call: {e}")
+        return None

@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from cfg import settings
-from services.openai_client import respond
+from services.openai_client import respond, respond_parsed
+from schemas.extraction import extraction_model
 from loaders.offense_loader import get_offense_meta
 from loaders.detail_loader import get_detail_schema
 
@@ -123,17 +124,15 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
 def extract_all(user_text: str, offense: str) -> Dict[str, Dict[str, dict]]:
     meta = get_offense_meta(offense)
     prompt = _build_single_prompt(user_text, meta, offense)
-    out = respond(settings.OPENAI_CHAT_MODEL, NEUTRAL_SYSTEM, prompt,
-                  reasoning_effort=settings.OPENAI_EXTRACT_REASONING_EFFORT)
-    try:
-        parsed = json.loads(out)
-    except Exception:
-        parsed = {"elements": {}, "details": {}}
-    if "elements" not in parsed or not isinstance(parsed["elements"], dict):
-        parsed["elements"] = {}
-    if "details" not in parsed or not isinstance(parsed["details"], dict):
-        parsed["details"] = {}
-    return parsed
+    # 출력은 죄목별 스키마로 강제한다. 모든 항목과 슬롯이 빠짐없이 온다.
+    out = respond_parsed(settings.OPENAI_CHAT_MODEL, NEUTRAL_SYSTEM, prompt, extraction_model(offense),
+                         reasoning_effort=settings.OPENAI_EXTRACT_REASONING_EFFORT)
+    if out is None:
+        # 실패하면 이전과 같이 빈 결과로 진행한다 (모든 항목이 '없음'으로 처리된다).
+        # 실패를 사용자에게 알리는 처리는 별도 변경으로 한다 (지표 M10).
+        print("[EXTRACT] 구조화 출력을 받지 못해 빈 결과로 진행합니다.")
+        return {"elements": {}, "details": {}}
+    return out.model_dump()
 
 # ---------- Enforcement (보수적 강제 규칙) ----------
 def enforce_elements(meta, elements: Dict[str, dict], user_text: str) -> Dict[str, dict]:
