@@ -272,14 +272,15 @@ def test_empty_draft_is_not_saved_as_a_finished_complaint(client, db_session, us
     """AI 서비스가 본문이 빈 초안을 돌려줘도 완성된 고소장으로 저장하지 않는다 (M10)."""
     from app.api import complaint as complaint_api
 
-    async def empty_compose(session_id):
-        return {"offense": "fraud", "title": "사기", "sections": {"criminal_facts": " ", "accusation_reason": ""}}
-
-    monkeypatch.setattr(complaint_api.ai_service, "chat_compose", empty_compose)
     cid = create_complaint(client, user_tokens)
     _with_session(db_session, cid)
-    r = client.post(f"/api/complaints/{cid}/generate", headers=auth_header(user_tokens))
-    assert r.status_code == 503
+    for sections in ({"criminal_facts": " ", "accusation_reason": ""}, {"criminal_facts": None}, None):
+        async def empty_compose(session_id, sections=sections):
+            return {"offense": "fraud", "title": "사기", "sections": sections}
+
+        monkeypatch.setattr(complaint_api.ai_service, "chat_compose", empty_compose)
+        r = client.post(f"/api/complaints/{cid}/generate", headers=auth_header(user_tokens))
+        assert r.status_code == 503, sections
     saved = _complaint(db_session, cid)
     assert saved.status != "completed" and not saved.generated_complaint_encrypted
 

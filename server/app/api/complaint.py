@@ -640,9 +640,9 @@ def _finish_generation(db: Session, complaint: Complaint, ai_response: dict) -> 
 
     사용자 확인을 기다리는 응답이면 저장하지 않는다. 고치기 전의 초안을 완성본으로 남기지 않기 위해서다.
     """
-    sections = ai_response.get("sections", {})
-    criminal_facts = sections.get("criminal_facts", "")
-    accusation_reason = sections.get("accusation_reason", "")
+    sections = ai_response.get("sections") or {}
+    criminal_facts = sections.get("criminal_facts") or ""
+    accusation_reason = sections.get("accusation_reason") or ""
     verification = ai_response.get("verification")
     if not isinstance(verification, dict):
         verification = None
