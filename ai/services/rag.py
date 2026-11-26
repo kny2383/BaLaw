@@ -112,9 +112,21 @@ def is_crime(name: str, keyword: str) -> bool:
     라벨에는 '사기{인정된죄명:...}'처럼 괄호로 덧붙인 말이나, 가운뎃점으로 이은 죄명('...법률위반·사기')도 있다.
     괄호 뒤는 떼고, 가운뎃점으로 나눈 조각도 따로 본다.
     """
+    return any(part.endswith(keyword.replace(" ", "")) for part in _name_parts(name))
+
+
+def is_only_crime(name: str, keyword: str) -> bool:
+    """죄명이 찾는 죄목만 가리키는가. 가운뎃점으로 다른 죄명을 이은 것은 아니다."""
     key = keyword.replace(" ", "")
+    whole, *pieces = _name_parts(name)
+    return whole.endswith(key) and ("·" in key or all(p.endswith(key) for p in pieces))
+
+
+def _name_parts(name: str) -> list[str]:
+    """괄호 뒤를 뗀 죄명과, 가운뎃점으로 나눈 조각들. 첫 원소가 전체다."""
     whole = re.split(r"[\[{(（]", name, maxsplit=1)[0].replace(" ", "")
-    return any(part.endswith(key) for part in [whole] + whole.split("·") if part)
+    pieces = [p for p in whole.split("·") if p] if "·" in whole else []
+    return [whole] + pieces
 
 
 def search_similar_cases_filtered(query_text: str, keyword: str, k: int = 3) -> list[dict]:
@@ -147,7 +159,7 @@ def search_similar_cases_filtered(query_text: str, keyword: str, k: int = 3) -> 
             "facts": meta.get("facts", ""),
             "score": results["distances"][0][i],
             # 찾는 죄목이 아닌 죄명이 섞여 있는가
-            "mixed": keyword != "기타" and not all(is_crime(n, keyword) for n in names),
+            "mixed": keyword != "기타" and not all(is_only_crime(n, keyword) for n in names),
         }
         filtered_cases.append(case_info)
 

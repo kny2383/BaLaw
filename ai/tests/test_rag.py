@@ -56,3 +56,12 @@ def test_keyword_candidates_that_matter_still_find_cases():
     """죄명 키워드와 판례 라벨의 죄명이 같은 말로 끝나야 걸린다. 지원 죄목과 평가 사례의 죄명으로 확인한다."""
     assert rag.is_crime("사기", "사기") and rag.is_crime("모욕", "모욕") and rag.is_crime("명예 훼손", "명예훼손")
     assert not rag.is_crime("사기", "컴퓨터등사용사기"), "더 좁은 죄명을 찾을 때 넓은 죄명의 판례는 고르지 않는다"
+
+
+def test_middle_dot_label_with_other_crimes_is_not_pure(monkeypatch):
+    """가운뎃점으로 여러 죄명을 이은 라벨은 쉼표가 없어도 한 죄목만 다룬 판례가 아니다."""
+    joined = "특정금융거래정보의보고및이용등에관한법률위반·외국환거래법위반·사기·배상명령신청"
+    assert rag.is_crime(joined, "사기") and not rag.is_only_crime(joined, "사기")
+    assert rag.is_only_crime("사기·상습사기", "사기") and rag.is_only_crime("사기{인정된죄명:특경법위반}", "사기")
+    assert rag.is_only_crime("아동·청소년의성보호에관한법률위반", "아동·청소년의성보호에관한법률위반")
+    assert _search(monkeypatch, [joined, "사기"], k=2) == ["사기", joined]
