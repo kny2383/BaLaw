@@ -40,7 +40,9 @@ from services.pipelines import (
 from services.verify import rewrite_draft, verify_draft
 
 DONE_REPLY = "필수 정보가 충족되었습니다. 고소장을 작성해드릴게요."
-EXTRACT_WINDOW_CHARS = 1800
+# 추출에 넣는 사용자 발화의 상한(글자 수). 넘으면 처음 서술을 지키고 최근 발화부터 채운다.
+# 평가 사례는 가장 긴 것도 600자를 넘지 않아 이 상한에 닿지 않는다.
+EXTRACT_WINDOW_CHARS = 6000
 
 
 def route_request(state: ChatState) -> str:

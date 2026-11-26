@@ -180,19 +180,35 @@ def enforce_details(details: Dict[str, dict], offense: str) -> Dict[str, dict]:
 
 # ---------- Follow-up Question Pickers ----------
 def _user_window(history: list[dict], max_chars: int = 2500) -> str:
-    """최근 사용자 메시지부터 거꾸로 합쳐 max_chars를 넘지 않게 만든 윈도우."""
-    buf = []
-    used = 0
-    for m in reversed(history):
-        if m["role"] != "user":
-            continue
-        c = m["content"]
-        if used + len(c) > max_chars and buf:
+    """추출에 넣을 사용자 발화. 모두 합쳐 max_chars 이하이면 전부 넣는다.
+
+    넘으면 처음 서술을 먼저 지키고, 남는 자리에 최근 발화부터 채운다. 사건의 대부분은 처음 서술에
+    있기 때문이다. 예전에는 최근 발화부터 채워서, 서술이 길면 서술이 통째로 빠졌다.
+    처음 서술만으로 넘치면 서술의 앞부분을 남긴다 (최근 발화 몫으로 3분의 1을 둔다).
+    """
+    users = [m["content"] for m in history if m["role"] == "user"]
+    if sum(len(c) for c in users) <= max_chars or len(users) <= 1:
+        if users and len(users[0]) > max_chars and len(users) == 1:
+            print(f"[EXTRACT] 처음 서술이 길어 앞 {max_chars}자만 추출에 넣음")
+            return users[0][:max_chars]
+        return "\n".join(users)
+
+    first, rest = users[0], users[1:]
+    first_budget = max_chars - min(sum(len(c) for c in rest), max_chars // 3)
+    if len(first) > first_budget:
+        print(f"[EXTRACT] 처음 서술이 길어 앞 {first_budget}자만 추출에 넣음")
+        first = first[:first_budget]
+    remaining = max_chars - len(first)
+    recent: list[str] = []
+    for c in reversed(rest):
+        if len(c) > remaining:
             break
-        buf.append(c); used += len(c)
-        if used >= max_chars:
-            break
-    return "\n".join(reversed(buf))
+        recent.append(c)
+        remaining -= len(c)
+    dropped = len(rest) - len(recent)
+    if dropped:
+        print(f"[EXTRACT] 대화가 길어 가운데 발화 {dropped}개를 추출에서 뺌")
+    return "\n".join([first] + list(reversed(recent)))
 
 def pick_detail_followup(details: Dict[str, dict], offense: str) -> Optional[str]:
     for spec in get_detail_schema(offense):

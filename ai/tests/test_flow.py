@@ -386,3 +386,60 @@ def test_phrase_found_in_several_sentences_gets_no_sentence(fake, monkeypatch):
     draft = "○ 고소인은 금원을 보냈습니다.\n○ 피고소인은 금원을 받았습니다."
     assert sentence_of("금원을", draft) == "금원을"
     assert sentence_of("보냈습니다", draft) == "고소인은 금원을 보냈습니다."
+
+
+# ---------- 추출에 넣는 사용자 발화 ----------
+def _old_window(history, max_chars):
+    """고치기 전의 구현. 짧은 대화에서 결과가 같다는 것을 보이려고 남긴다."""
+    buf, used = [], 0
+    for m in reversed(history):
+        if m["role"] != "user":
+            continue
+        c = m["content"]
+        if used + len(c) > max_chars and buf:
+            break
+        buf.append(c)
+        used += len(c)
+        if used >= max_chars:
+            break
+    return "\n".join(reversed(buf))
+
+
+def _hist(*users):
+    out = []
+    for u in users:
+        out += [{"role": "user", "content": u}, {"role": "assistant", "content": "질문"}]
+    return out
+
+
+def test_short_dialogue_window_is_unchanged():
+    """예전 상한(1,800자) 안의 대화는 추출 입력이 글자까지 같다. 평가 사례는 모두 여기에 든다."""
+    from services.pipelines import _user_window
+    history = _hist("서술 " * 100, "위 사건 개요를 기반으로, 이어서 질문을 해 주세요.", "답 " * 200, "잘 모르겠어요.")
+    assert sum(len(m["content"]) for m in history if m["role"] == "user") < 1800
+    assert _user_window(history, max_chars=6000) == _old_window(history, 1800)
+
+
+def test_long_narrative_is_not_dropped():
+    """서술이 길면 예전에는 서술이 통째로 빠지고 고정 문장만 추출에 들어갔다."""
+    from services.pipelines import _user_window
+    narrative, kickoff = "가" * 2000, "위 사건 개요를 기반으로, 이어서 질문을 해 주세요."
+    history = _hist(narrative, kickoff)
+    assert _old_window(history, 1800) == kickoff, "고치기 전의 동작"
+    assert _user_window(history, max_chars=6000) == narrative + "\n" + kickoff
+
+
+def test_window_keeps_the_narrative_and_recent_answers_when_over_the_limit():
+    from services.pipelines import _user_window
+    narrative = "서술" * 100                      # 200자
+    answers = [f"답{i:02d}" + "x" * 97 for i in range(10)]  # 100자씩
+    out = _user_window(_hist(narrative, *answers), max_chars=500)
+    assert out.split("\n") == [narrative] + answers[-3:]  # 처음 서술과 최근 답 3개
+    assert len(out.replace("\n", "")) <= 500
+
+
+def test_very_long_narrative_is_cut_but_recent_answers_stay():
+    from services.pipelines import _user_window
+    out = _user_window(_hist("가" * 5000, "최근 답"), max_chars=900)
+    assert out == "가" * (900 - len("최근 답")) + "\n최근 답"
+    assert _user_window(_hist("가" * 5000), max_chars=900) == "가" * 900
