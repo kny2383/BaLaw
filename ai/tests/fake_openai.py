@@ -40,6 +40,7 @@ class FakeOpenAI:
         self.fail_extract = False     # True면 추출 요청에 400을 돌려준다
         self.keyword = "사기"
         self.fail_keyword = False     # True면 죄명 키워드 요청에 400을 돌려준다
+        self.compose_text = COMPOSE_TEXT
 
     def close(self) -> None:
         self._server.shutdown()
@@ -66,7 +67,7 @@ class FakeOpenAI:
         else:
             text = "\n".join(str(m.get("content", "")) for m in body.get("messages", []))
             if "drafting assistant" in text:
-                content = COMPOSE_TEXT
+                content = self.compose_text
             elif "죄목 리스트" in text:
                 if self.fail_keyword:
                     return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}

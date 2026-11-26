@@ -25,7 +25,8 @@ SID = "session-1"
 NARRATIVE = "표식서술 중고거래로 삼십만원을 보냈습니다"
 MESSAGE = "표식발화 오월 삼일입니다"
 # 저장소에서 찾으면 안 되는 글. 사용자가 쓴 글과 LLM이 만든 글(요약, 초안, 키워드, 판례)이 모두 들어 있다.
-SECRETS = [NARRATIVE, MESSAGE, "확인된 내용을 정리했습니다", "고소인은 피고소인에게", "표식키워드", "판례 요약 1", "2020고단1"]
+PHONE = "010-9999-8888"  # 치환 상태(표식 → 원래 값)에 들어가는 값
+SECRETS = [NARRATIVE, MESSAGE, PHONE, "확인된 내용을 정리했습니다", "고소인은 피고소인에게", "표식키워드", "판례 요약 1", "2020고단1"]
 
 
 @pytest.fixture
@@ -55,7 +56,8 @@ def _run_conversation(saver, fake, monkeypatch):
     fake.slot_value, fake.item_status = "missing", "missing"
     chat, rag_graph = build_chat_graph(saver), build_rag_graph(saver)
     cfg = checkpoint.chat_config(SID)
-    chat.invoke({"request": {"action": "init", "text": NARRATIVE, "offense": "fraud", "offense_selected": True}}, cfg)
+    chat.invoke({"request": {"action": "init", "text": NARRATIVE, "offense": "fraud", "offense_selected": True,
+                             "pii": {"known": {}, "tokens": {"[전화번호1]": PHONE}}}}, cfg)
     monkeypatch.setattr(rag, "search_similar_cases_filtered", lambda text, keyword, k=2: FakeCollection().query([text], 3)["metadatas"][0][:k])
     rag_graph.invoke({"request": {"text": NARRATIVE}}, checkpoint.rag_config(SID))
     out = chat.invoke({"request": {"action": "message", "message": MESSAGE}}, cfg)

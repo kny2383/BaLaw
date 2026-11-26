@@ -43,6 +43,8 @@ class Settings:
     # 정보 추출 호출의 추론 강도. 기본값 low의 근거는 eval/results/extract-low-dev10.md.
     # 지정하지 않던 이전 동작(모델 기본값)과 비교하려면 medium으로 둔다.
     OPENAI_EXTRACT_REASONING_EFFORT: str = _reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
+    # 사용자 서술의 식별정보를 표식으로 바꿔 LLM에 보낸다 (S05). 0이면 끈다 (전후 비교용).
+    PII_MASKING: bool = os.getenv("PII_MASKING", "").strip() != "0"
     # 대화 상태(체크포인트) 저장소. 비우면 메모리에 두고 서비스가 재시작하면 사라진다.
     # 값을 넣으면 PostgreSQL에 저장하며, 이때 암호화 키가 없으면 서비스가 뜨지 않는다.
     CHECKPOINT_DB_URL: str = os.getenv("CHECKPOINT_DB_URL", "").strip()

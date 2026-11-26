@@ -18,6 +18,7 @@ class ChatState(TypedDict, total=False):
     offense_selected: bool       # 사용자가 죄목을 직접 골랐는가
     history: list[dict]          # [{"role": "user" | "assistant", "content": str}]
     collected: dict              # {"elements": {...}, "details": {...}}
+    pii: dict                    # 식별정보 치환 상태 {"known": {...}, "tokens": {표식: 원래 값}}. 대화 글은 표식으로만 저장된다
 
     # 이번 요청과 그 결과 (요청마다 덮어쓴다)
     request: dict                # {"action": "init" | "message" | "compose", ...}
