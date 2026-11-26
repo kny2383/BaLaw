@@ -51,6 +51,8 @@ class FakeOpenAI:
         self.fail_verify = False      # True면 초안 검증 요청에 400을 돌려준다
         self.rewrite_text = REWRITE_TEXT
         self.compose_text = COMPOSE_TEXT
+        self.fail_compose = False     # True면 초안 작성 요청에 400을 돌려준다
+        self.fail_rewrite = False     # True면 재작성 요청에 400을 돌려준다
 
     def close(self) -> None:
         self._server.shutdown()
@@ -83,8 +85,12 @@ class FakeOpenAI:
         else:
             text = "\n".join(str(m.get("content", "")) for m in body.get("messages", []))
             if "revise a draft" in text:
+                if self.fail_rewrite:
+                    return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
                 content = self.rewrite_text
             elif "drafting assistant" in text:
+                if self.fail_compose:
+                    return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
                 content = self.compose_text
             elif "죄목 리스트" in text:
                 if self.fail_keyword:

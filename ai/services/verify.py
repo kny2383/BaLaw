@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from cfg import settings
 from schemas.verification import Verification
-from services.openai_client import respond, respond_parsed
+from services.openai_client import LLMCallError, respond, respond_parsed
 from services.pipelines import PII_NOTE, postprocess_complaint, split_complaint_sections
 
 SECTION_TITLES = {"criminal_facts": "범죄사실", "accusation_reason": "고소이유"}
@@ -104,7 +104,10 @@ def rewrite_draft(sections: dict, unsupported: list[dict]) -> dict | None:
     """근거 없는 표현만 고쳐 다시 쓴다 (LLM 호출). 쓸 수 있는 결과가 나오지 않으면 None."""
     listed = "\n".join(_listed(c) for c in unsupported)
     user = f"{REWRITE_RULES}\n[근거 없는 표현]\n{listed}\n\n[초안]\n{format_draft(sections)}\n"
-    out = respond(settings.OPENAI_COMPOSE_MODEL, REWRITE_SYSTEM, user)
+    try:
+        out = respond(settings.OPENAI_COMPOSE_MODEL, REWRITE_SYSTEM, user)
+    except LLMCallError:
+        return None  # 호출하는 쪽이 '다시 쓰지 못함'으로 남긴다. 초안은 그대로다.
     new = split_complaint_sections(postprocess_complaint(out))
     if not all(new.get(key, "").strip() for key in SECTION_TITLES if sections.get(key, "").strip()):
         return None
