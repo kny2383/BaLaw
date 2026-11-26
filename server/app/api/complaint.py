@@ -86,15 +86,11 @@ def get_fallback_chat_meta(messages: list[ChatMessage]) -> tuple[Optional[dict],
 
 
 def build_visible_chat_query(db: Session, complaint_id: int):
-    query = db.query(ChatMessage).filter(ChatMessage.complaint_id == complaint_id)
-    if INTERNAL_BOOTSTRAP_MESSAGES:
-        query = query.filter(
-            not_(
-                (ChatMessage.role == "user")
-                & (ChatMessage.content.in_(tuple(INTERNAL_BOOTSTRAP_MESSAGES)))
-            )
-        )
-    return query
+    # 내용은 암호화되어 있어 SQL로 비교할 수 없다. 저장할 때 표시해 둔 열로 거른다.
+    return db.query(ChatMessage).filter(
+        ChatMessage.complaint_id == complaint_id,
+        not_(ChatMessage.is_internal),
+    )
 
 
 def get_paginated_chat_messages(
@@ -487,7 +483,7 @@ async def send_chat_message(
         user_message = ChatMessage(
             complaint_id=complaint_id,
             role="user",
-            content=request.message
+            content=request.message,
         )
         db.add(user_message)
         db.flush()  # user_message를 DB에 반영하여 복원 제외 조건에 활용

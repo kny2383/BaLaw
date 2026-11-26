@@ -394,3 +394,99 @@ def test_known_pii_skips_placeholder_names(client, db_session, user_tokens):
     known = known_pii_of(db_session.get(Complaint, cid))
     assert known["names"] == [COMPLAINANT["complainant_name"]]
     assert known["addresses"] == [COMPLAINANT["complainant_address"], "부산광역시 가상구 가상로 9"]
+
+
+# ---------- 채팅 기록 암호화 (S03) ----------
+KICKOFF = "위 사건 개요를 기반으로, 이어서 질문을 해 주세요."
+NARRATIVE = "표식서술 중고거래로 삼십만원을 보냈습니다"
+ANSWER = "표식답변 오월 삼일입니다"
+QUESTION = "표식질문 언제 송금하셨나요?"
+
+
+def _chat(client, db_session, user_tokens, monkeypatch) -> int:
+    """대화 한 건: 서술 → 고정 문장(저장하지 않음) → 질문 → 답 → 질문."""
+    from app.api import complaint as complaint_api
+
+    async def fake_init(text, offense=None, known_pii=None):
+        return {"session_id": "ai-session-1", "offense": "fraud", "rag_status": "pending", "rag_keyword": None, "rag_cases": []}
+
+    async def fake_send(session_id, message):
+        return {"reply": QUESTION, "session_id": session_id}
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", fake_init)
+    monkeypatch.setattr(complaint_api.ai_service, "chat_send", fake_send)
+    cid = create_complaint(client, user_tokens)
+    h = auth_header(user_tokens)
+    assert client.post(f"/api/complaints/{cid}/chat/init", json={"text": NARRATIVE, "offense": "사기"}, headers=h).status_code == 200
+    for message in (KICKOFF, ANSWER):
+        assert client.post(f"/api/complaints/{cid}/chat/ai-session-1", json={"message": message}, headers=h).status_code == 200
+    return cid
+
+
+def _raw_chat_rows(db_session):
+    from sqlalchemy import text
+    return db_session.execute(text("SELECT role, content, reason, is_internal FROM chat_messages ORDER BY id")).fetchall()
+
+
+def test_chat_text_is_not_stored_in_plain(client, db_session, user_tokens, monkeypatch):
+    _chat(client, db_session, user_tokens, monkeypatch)
+    rows = _raw_chat_rows(db_session)
+    assert len(rows) == 4
+    stored = " ".join(str(v) for row in rows for v in row)
+    for secret in (NARRATIVE, ANSWER, QUESTION, KICKOFF, "표식"):
+        assert secret not in stored
+    assert all(row.content.startswith("enc:v1:") for row in rows)
+
+
+def test_chat_history_reads_back_and_hides_the_bootstrap_message(client, db_session, user_tokens, monkeypatch):
+    cid = _chat(client, db_session, user_tokens, monkeypatch)
+    h = auth_header(user_tokens)
+    for query in ("", "?limit=50"):  # 전체 조회와 쪽 단위 조회는 거르는 경로가 다르다
+        messages = client.get(f"/api/complaints/{cid}/chat/history{query}", headers=h).json()["messages"]
+        assert [m["content"] for m in messages] == [NARRATIVE, QUESTION, ANSWER, QUESTION], query
+    assert not any(r.is_internal for r in _raw_chat_rows(db_session))
+
+
+def test_restore_history_skips_the_bootstrap_message(client, db_session, user_tokens, monkeypatch):
+    from app.api.complaint import get_restore_history
+    cid = _chat(client, db_session, user_tokens, monkeypatch)
+    assert [m["content"] for m in get_restore_history(db_session, cid)] == [NARRATIVE, ANSWER]
+
+
+def _migration():
+    import importlib.util
+    from pathlib import Path
+    path = next((Path(__file__).resolve().parents[1] / "alembic" / "versions").glob("a7c3e9d1f052_*.py"))
+    spec = importlib.util.spec_from_file_location("encrypt_chat_messages", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_migration_encrypts_rows_stored_before_and_can_be_rerun(client, db_session, user_tokens, monkeypatch):
+    """암호화 전에 평문으로 저장된 행: 암호화되고, 고정 문장에 표시가 남고, 화면에는 같은 내용이 보인다."""
+    from sqlalchemy import text
+    cid = create_complaint(client, user_tokens)
+    for role, content in (("user", NARRATIVE), ("user", KICKOFF), ("assistant", QUESTION), ("user", ANSWER)):
+        db_session.execute(text("INSERT INTO chat_messages (complaint_id, role, content, is_internal) VALUES (:c, :r, :t, 0)"),
+                           {"c": cid, "r": role, "t": content})
+    db_session.commit()
+    h = auth_header(user_tokens)
+    # 마이그레이션 전의 평문 행도 읽힌다.
+    before = client.get(f"/api/complaints/{cid}/chat/history", headers=h).json()["messages"]
+    assert [m["content"] for m in before] == [NARRATIVE, QUESTION, ANSWER]
+
+    migration = _migration()
+    assert migration.encrypt_rows(db_session.connection()) == 4
+    assert migration.encrypt_rows(db_session.connection()) == 0, "다시 실행해도 이미 암호화된 행은 그대로다"
+    db_session.commit()
+    rows = _raw_chat_rows(db_session)
+    assert all(r.content.startswith("enc:v1:") for r in rows) and "표식" not in " ".join(r.content for r in rows)
+    assert [bool(r.is_internal) for r in rows] == [False, True, False, False]
+    for query in ("", "?limit=50"):
+        after = client.get(f"/api/complaints/{cid}/chat/history{query}", headers=h).json()["messages"]
+        assert [m["content"] for m in after] == [NARRATIVE, QUESTION, ANSWER]
+
+    assert migration.decrypt_rows(db_session.connection()) == 4
+    db_session.commit()
+    assert [r.content for r in _raw_chat_rows(db_session)] == [NARRATIVE, KICKOFF, QUESTION, ANSWER]

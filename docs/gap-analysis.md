@@ -82,7 +82,7 @@
 |---|---|---|---|
 | S01 | 다름 | 필드 암호화는 구현. 방식은 AES-256이 아니라 Fernet(AES-128-CBC와 HMAC) | Server `app/services/encryption_service.py` |
 | S02 | 구현 | 범죄사실·고소이유·입증 내용·생성 문서 암호화 | Server `app/models/complaint.py` |
-| S03 | 없음 | 채팅 메시지 내용이 평문 Text 컬럼 | Server `app/models/chat_message.py` |
+| S03 | 없음 → 2026-11-27 암호화 | 채팅 메시지 내용이 평문 Text 컬럼이었다. 지금은 내용과 이유를 암호화해서 저장한다 | Server `app/models/chat_message.py`, `app/models/encrypted_text.py` |
 | S04 | 구현 | argon2 해시. D3의 bcrypt보다 강한 방식이라 문서만 수정 | Server `app/services/auth_service.py` |
 | S05 | 없음 | 치환 코드 없음. 자유 서술 원문이 OpenAI로 전송됨. 폼 인적정보는 AI로 보내지 않음 | Server `app/services/ai_service.py`, AI `services/openai_client.py` |
 | S06 | 다름 | 기준이 "작성 완료"가 아니라 "다운로드 시점 + 1일". 자정 1회 실행이라 최대 48시간. 미다운로드 건은 삭제 안 됨 | Server `app/services/scheduler_service.py` |
