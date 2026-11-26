@@ -95,12 +95,34 @@ def predict_crime_keyword(user_query: str) -> str:
     return (resp.choices[0].message.content or "").strip()
 
 
-# 벡터 검색 + 키워드 필터
+# 벡터 검색 + 죄명 필터
+SEARCH_CANDIDATES = 100  # 서술과 가까운 판례를 이만큼 가져와 그 안에서 고른다
+
+
+def crime_names(label: str) -> list[str]:
+    """판례 라벨(쉼표로 이은 죄명들)을 죄명 목록으로 나눈다."""
+    return [c.strip() for c in (label or "").split(",") if c.strip()]
+
+
+def is_crime(name: str, keyword: str) -> bool:
+    """죄명이 찾는 죄목인가. '상습사기', '업무상횡령'처럼 앞에 말이 붙은 것도 같은 죄목으로 본다.
+
+    글자가 들어 있는지로만 보면 '군사기밀보호법위반'이 '사기'로 잡힌다.
+    """
+    return name.replace(" ", "").endswith(keyword.replace(" ", ""))
+
+
 def search_similar_cases_filtered(query_text: str, keyword: str, k: int = 3) -> list[dict]:
+    """서술과 가까운 판례 가운데 찾는 죄목의 판례를 고른다.
+
+    판례 하나에 죄명이 여럿 붙은 경우가 많고, 라벨에는 어느 것이 주된 죄명인지가 없다.
+    그래서 죄명이 모두 찾는 죄목인 판례를 먼저 고르고, 모자라면 다른 죄명이 섞인 판례로 채운다.
+    같은 묶음 안에서는 서술과 가까운 순서다.
+    """
     collection = get_collection()
     results = collection.query(
         query_texts=[query_text],
-        n_results=50,
+        n_results=SEARCH_CANDIDATES,
     )
 
     filtered_cases: list[dict] = []
@@ -108,8 +130,9 @@ def search_similar_cases_filtered(query_text: str, keyword: str, k: int = 3) -> 
     for i in range(len(results["ids"][0])):
         meta = results["metadatas"][0][i]
         label = meta.get("label", "")
+        names = crime_names(label)
 
-        if keyword not in label and keyword != "기타":
+        if keyword != "기타" and not any(is_crime(n, keyword) for n in names):
             continue
 
         case_info = {
@@ -117,14 +140,16 @@ def search_similar_cases_filtered(query_text: str, keyword: str, k: int = 3) -> 
             "label": label,
             "summary": meta.get("summary", ""),
             "facts": meta.get("facts", ""),
-            "score": results["distances"][0][i], 
+            "score": results["distances"][0][i],
+            # 찾는 죄목이 아닌 죄명이 섞여 있는가
+            "mixed": keyword != "기타" and not all(is_crime(n, keyword) for n in names),
         }
         filtered_cases.append(case_info)
 
     if not filtered_cases:
         return []
 
-    filtered_cases.sort(key=lambda c: c["score"])
+    filtered_cases.sort(key=lambda c: (c["mixed"], c["score"]))
 
     return filtered_cases[:k]
 
@@ -232,8 +257,9 @@ def summarize_single_case(case: dict) -> dict:
 
 def _normalize_case_summary(fallback: dict, data: dict) -> dict:
     return {
-        "case_no": data.get("case_no") or fallback.get("case_no", ""),
-        "label": data.get("label") or fallback.get("label", ""),
+        # 사건번호와 죄명은 검색 결과의 값을 쓴다. LLM이 돌려준 값은 쓰지 않는다 (다른 번호를 지어낼 수 있다).
+        "case_no": fallback.get("case_no", ""),
+        "label": fallback.get("label", ""),
         "summary": (data.get("summary") or "").strip()
         or fallback.get("summary", "")[:200]
         or fallback.get("facts", "")[:200],
