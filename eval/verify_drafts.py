@@ -57,7 +57,7 @@ def main() -> int:
     if settings.DRAFT_MAX_REWRITES < 1:
         raise SystemExit("DRAFT_MAX_REWRITES가 0이라 검증하지 않는다. 1 이상으로 두고 실행한다.")
     if settings.DRAFT_CONFIRM:
-        raise SystemExit("DRAFT_CONFIRM이 켜져 있다. 이 도구는 사용자 확인에 답하지 못하므로 끄고 실행한다.")
+        raise SystemExit("DRAFT_CONFIRM이 켜져 있다(기본). 이 도구는 사용자 확인에 답하지 못하므로 -e DRAFT_CONFIRM=0을 붙여 실행한다.")
     print(f"재작성 상한 {settings.DRAFT_MAX_REWRITES}", flush=True)
 
     src_dir = ROOT / "runs" / args.src / "cases"

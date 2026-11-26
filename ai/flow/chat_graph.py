@@ -8,7 +8,7 @@
                                   ▲        └─ 있음 ─▶ rewrite ─┬─ 횟수 남음 ─▶ verify
                                   └────────────────────────────┘└─ 상한 ─▶ 끝
 
-DRAFT_CONFIRM이 켜져 있으면 verify와 rewrite 사이에 confirm이 들어간다. confirm은 실행을 멈추고
+DRAFT_CONFIRM이 켜져 있으면(기본) verify와 rewrite 사이에 confirm이 들어간다. confirm은 실행을 멈추고
 (interrupt) 사용자의 답을 기다린다. 답이 오면 멈춘 자리에서 이어서, 사용자가 사실이 아니라고 한
 표현만 rewrite로 보낸다. 멈춘 상태는 체크포인터에 남으므로 서비스가 재시작해도 이어 갈 수 있다.
 

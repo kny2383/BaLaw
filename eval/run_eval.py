@@ -65,7 +65,7 @@ JUDGE_SCHEMA = {
     },
 }
 
-# 모의 사용자의 확인 답 (서비스가 DRAFT_CONFIRM=1일 때). 초안의 표현이 사용자가 겪은 사실인지 답한다.
+# 모의 사용자의 확인 답 (서비스의 사용자 확인이 켜져 있을 때, 기본). 초안의 표현이 사용자가 겪은 사실인지 답한다.
 # 사용자가 아는 것은 사례의 처음 서술과 모든 항목의 정답이다. 대화에서 묻지 않아 말하지 않은 것도 포함한다.
 CONFIRM_MAX_ROUNDS = 3
 CONFIRM_SYSTEM = (
@@ -537,7 +537,7 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["verification_status"] = {k: sum(1 for v in review if v.get("status") == k)
                                 for k in sorted({v.get("status") for v in review})}
     s["verification_removed_total"] = sum(len(v.get("removed") or []) for v in review)
-    # 사용자 확인 (서비스가 DRAFT_CONFIRM=1일 때만 값이 생긴다)
+    # 사용자 확인 (서비스의 사용자 확인이 켜져 있을 때만 값이 생긴다)
     rounds = [rnd for r in results for rnd in r.get("confirm") or []]
     s["confirm_cases"] = sum(1 for r in results if r.get("confirm"))
     # 참이면 M1의 근거에 사용자의 확인 답이 들어 있다. 확인을 끈 실행의 M1과 같은 척도가 아니다.
