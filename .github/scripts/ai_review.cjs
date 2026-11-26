@@ -1,4 +1,4 @@
-// LS-Final-Project/ls-final-project의 .github/scripts/ai_review.cjs를 balaw용으로 옮김 (참고 모드, 표식 이름 변경)
+// PR 변경분을 Claude로 검토해 결과를 PR 댓글로 남긴다 (참고 모드).
 'use strict';
 
 const fs = require('node:fs/promises');
