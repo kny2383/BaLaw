@@ -14,6 +14,7 @@ from services.pipelines import (
     pick_element_followup, # 구성요건 질문 선정
     classify_need_caution, # 고위험 경고 감지
     _user_window,
+    _dialogue_window,
     compose_complaint
 )
 from services.rag import run_rag_preview, map_keyword_to_offense
@@ -145,8 +146,8 @@ def _send_to_session(session_id: str, message: str) -> dict:
     s["history"].append({"role": "user", "content": message})
     user_text = _user_window(s["history"], max_chars=1800)
 
-    # LLM 호출
-    parsed = extract_all(user_text, offense)
+    # LLM 호출. 추출 입력에는 사용자 발화와 그 앞의 AI 질문을 함께 넣는다.
+    parsed = extract_all(_dialogue_window(s["history"], max_chars=1800), offense)
     elements = enforce_elements(meta, parsed.get("elements", {}), user_text)
     details  = enforce_details(parsed.get("details", {}), offense)
 

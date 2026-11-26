@@ -94,7 +94,10 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
         "- 'summary'는 단순히 사용자의 말을 앵무새처럼 요약하는 필드가 아닙니다! 해당 항목에서 어떤 정보는 확인되었고, 반대로 '어떤 정보가 아직 비어있어서(missing) 이 추가 질문을 던지는 것인지' 그 이유(명분)를 상담원처럼 부드럽게 간략한 1문장으로 짚어주세요.\n"
         "- 각 항목의 status는 'satisfied|missing|unclear'\n"
         "- 각 항목의 slots 값은 'present|missing|unclear|unknown' 중 하나만 사용할 것.\n"
-        "- 가능할 때 evidence에 짧게 한 구절만 인용(없으면 빈 문자열)\n\n"
+        "- 가능할 때 evidence에 짧게 한 구절만 인용(없으면 빈 문자열)\n"
+        "- 아래 [대화]에서 '[AI 질문]' 줄은 바로 다음 '[사용자]' 답변이 무엇에 대한 답인지 알기 위한 맥락입니다. "
+        "사실은 '[사용자]' 줄에서만 확인하고, 질문 문장에만 있는 내용은 사실로 쓰지 말며, evidence도 '[사용자]' 줄에서만 인용하십시오.\n"
+        "- '네', '없어요', '모르겠어요'처럼 짧은 답변은 바로 앞 '[AI 질문]'이 물은 항목에 대한 답으로 해석하십시오.\n\n"
         "JSON만 출력:\n"
         "{\n"
         '  "elements": {\n'
@@ -116,7 +119,7 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
         "}\n\n"
         "[elements]\n" + elines + "\n\n" +
         "[details]\n" + dlines + "\n\n" +
-        "[사용자 서술]\n" + user_text
+        "[대화]\n" + user_text
     )
 
 
@@ -193,6 +196,32 @@ def _user_window(history: list[dict], max_chars: int = 2500) -> str:
         if used >= max_chars:
             break
     return "\n".join(reversed(buf))
+
+def _dialogue_window(history: list[dict], max_chars: int = 2500) -> str:
+    """정보 추출에 넘길 대화 윈도우. 사용자 발화마다 바로 앞의 AI 질문을 함께 넣는다.
+
+    포함되는 사용자 발화는 _user_window와 같다 (max_chars는 사용자 발화 글자 수만 센다).
+    질문이 없으면 "네", "없어요" 같은 짧은 답이 어느 항목에 대한 답인지 알 수 없다.
+    """
+    picked: list[int] = []
+    used = 0
+    for i in range(len(history) - 1, -1, -1):
+        m = history[i]
+        if m["role"] != "user":
+            continue
+        c = m["content"]
+        if used + len(c) > max_chars and picked:
+            break
+        picked.append(i); used += len(c)
+        if used >= max_chars:
+            break
+
+    lines = []
+    for i in reversed(picked):
+        if i > 0 and history[i - 1]["role"] == "assistant":
+            lines.append("[AI 질문] " + history[i - 1]["content"])
+        lines.append("[사용자] " + history[i]["content"])
+    return "\n".join(lines)
 
 def pick_detail_followup(details: Dict[str, dict], offense: str) -> Optional[str]:
     for spec in get_detail_schema(offense):
