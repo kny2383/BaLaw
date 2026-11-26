@@ -285,6 +285,34 @@ def test_empty_draft_is_not_saved_as_a_finished_complaint(client, db_session, us
     assert saved.status != "completed" and not saved.generated_complaint_encrypted
 
 
+# ---------- 미지원 죄목 (F11) ----------
+def test_unsupported_offense_starts_nothing(client, db_session, user_tokens, monkeypatch):
+    """AI 서비스가 미지원으로 답하면 세션도 대화 기록도 남기지 않고 사용자에게 안내한다."""
+    from sqlalchemy import text
+
+    from app.api import complaint as complaint_api
+
+    async def unsupported_init(text, offense=None, known_pii=None):
+        return {"session_id": None, "offense": "unsupported", "rag_status": "skipped", "rag_keyword": None, "rag_cases": []}
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", unsupported_init)
+    cid = create_complaint(client, user_tokens)
+    r = client.post(f"/api/complaints/{cid}/chat/init", json={"text": "돈을 맡겼는데 돌려주지 않습니다", "offense": "횡령"},
+                    headers=auth_header(user_tokens))
+    assert r.status_code == 422 and "지원하지 않는" in r.json()["detail"]
+    saved = _complaint(db_session, cid)
+    assert saved.ai_session_id is None and saved.crime_type is None
+    assert db_session.execute(text("SELECT count(*) FROM chat_messages")).scalar() == 0
+
+    # 죄목은 지원하는데 세션 ID가 없는 응답은 AI 서비스의 문제이므로 실패(503)로 알린다.
+    async def broken_init(text, offense=None, known_pii=None):
+        return {"session_id": None, "offense": "fraud"}
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", broken_init)
+    r = client.post(f"/api/complaints/{cid}/chat/init", json={"text": "서술", "offense": "사기"}, headers=auth_header(user_tokens))
+    assert r.status_code == 503 and _complaint(db_session, cid).ai_session_id is None
+
+
 # ---------- 고소장 생성: 사용자 확인 ----------
 WAITING = {"status": "awaiting_confirmation", "rewrites": 0, "rechecked": False, "removed": [], "confirmed": [],
            "unsupported": [{"quote": "극심한 고통", "reason": "대화에 없는 내용"}],
