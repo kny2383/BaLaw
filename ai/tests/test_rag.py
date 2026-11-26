@@ -65,3 +65,10 @@ def test_middle_dot_label_with_other_crimes_is_not_pure(monkeypatch):
     assert rag.is_only_crime("사기·상습사기", "사기") and rag.is_only_crime("사기{인정된죄명:특경법위반}", "사기")
     assert rag.is_only_crime("아동·청소년의성보호에관한법률위반", "아동·청소년의성보호에관한법률위반")
     assert _search(monkeypatch, [joined, "사기"], k=2) == ["사기", joined]
+
+
+def test_summary_keeps_the_retrieved_case_number_and_label():
+    """LLM이 다른 사건번호나 죄명을 돌려줘도 검색 결과의 값을 쓴다."""
+    case = {"case_no": "2020도1", "label": "사기", "summary": "", "facts": "사실"}
+    out = rag._normalize_case_summary(case, {"case_no": "9999도9999", "label": "살인", "summary": "요약", "result": "유죄"})
+    assert out == {"case_no": "2020도1", "label": "사기", "summary": "요약", "result": "유죄"}
