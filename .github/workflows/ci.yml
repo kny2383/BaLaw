@@ -84,6 +84,7 @@ jobs:
       # 외부 호출은 모두 대역이다. OpenAI 키가 없어도 돌고 비용이 들지 않는다.
       - run: pytest -q
 
+  eval-cases:
     name: 평가 사례 형식·정답 잠금 검사
     needs: changes
     if: needs.changes.outputs.eval == 'true'
