@@ -5,19 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Literal, Optional
 from cfg import settings
-from loaders.offense_loader import get_offense_meta
-from services.pipelines import (
-    extract_all,           # 단일 프롬프트 추출 
-    enforce_elements,      # elements 보수 강제
-    enforce_details,       # details 보수 강제
-    pick_detail_followup,  # 디테일 우선 질문 선정
-    pick_element_followup, # 구성요건 질문 선정
-    classify_need_caution, # 고위험 경고 감지
-    _user_window,
-    compose_complaint
-)
+from flow.chat_graph import build_chat_graph
+from flow.checkpoint import chat_config, delete_session, rag_config
+from flow.rag_graph import build_rag_graph
 from services.openai_client import StructuredOutputError
-from services.rag import run_rag_preview, map_keyword_to_offense
+from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
 
 app = FastAPI(title="BARO-AI: Complaint Draft API", version="0.1.0")
@@ -36,7 +28,9 @@ app.add_middleware(
     allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
 
-SESSIONS: dict[str, dict] = {} 
+# 세션 상태는 그래프의 체크포인터에 thread별로 남는다 (flow/checkpoint.py).
+CHAT_GRAPH = build_chat_graph()
+RAG_GRAPH = build_rag_graph()
 
 class FollowupRequest(BaseModel):
     offense: Literal["fraud", "insult"]
@@ -84,43 +78,53 @@ def _normalize_offense(offense: Optional[str]) -> Optional[str]:
     return offense_map.get(normalized, "fraud")
 
 
-def _build_session(text: str, offense: Optional[str] = None) -> dict:
-    selected_offense = _normalize_offense(offense)
+def _session(session_id: str) -> dict:
+    """세션의 현재 대화 상태. 없으면 404."""
+    values = CHAT_GRAPH.get_state(chat_config(session_id)).values
+    if not values:
+        raise HTTPException(404, "세션을 찾을 수 없습니다. /chat/init 먼저 호출하세요.")
+    return values
 
+
+def _rag(session_id: str) -> dict:
+    """판례 검색 상태. 아직 끝나지 않았으면 pending."""
+    values = RAG_GRAPH.get_state(rag_config(session_id)).values
     return {
-        "offense": selected_offense or "fraud",
-        "history": [
-            {"role": "user", "content": text},
-        ],
-        "collected": {},
-        "rag_status": "pending",
-        "rag_keyword": None,
-        "rag_cases": [],
-        "rag_error": None,
-        "_selected_offense": bool(selected_offense),
+        "rag_status": values.get("status", "pending"),
+        "rag_keyword": values.get("keyword") if values.get("status") else None,
+        "rag_cases": (values.get("cases") or []) if values.get("status") else [],
     }
 
 
+def _offense_from_rag(session_id: str, state: dict):
+    """죄목을 직접 고르지 않은 세션은 판례 검색이 끝나면 그 키워드로 양식을 정한다."""
+    if state.get("offense_selected"):
+        return None
+    rag = _rag(session_id)
+    if rag["rag_status"] != "ready":
+        return None
+    return map_keyword_to_offense(rag["rag_keyword"])
+
+
+def _create_session(session_id: str, text: str, offense: Optional[str] = None) -> dict:
+    selected_offense = _normalize_offense(offense)
+    return CHAT_GRAPH.invoke(
+        {"request": {
+            "action": "init",
+            "text": text,
+            "offense": selected_offense or "fraud",
+            "offense_selected": bool(selected_offense),
+        }},
+        chat_config(session_id),
+    )
+
+
 def _load_rag_preview(session_id: str, text: str) -> None:
-    s = SESSIONS.get(session_id)
-    if not s:
-        return
-
+    config = rag_config(session_id)
     try:
-        rag = run_rag_preview(text, k=2)
-        rag_keyword = rag["keyword"]
-        rag_cases = rag["cases"]
-
-        s["rag_keyword"] = rag_keyword
-        s["rag_cases"] = rag_cases
-        s["rag_status"] = "ready"
-        s["rag_error"] = None
-
-        if not s.get("_selected_offense"):
-            s["offense"] = map_keyword_to_offense(rag_keyword)
+        RAG_GRAPH.invoke({"text": text}, config)
     except Exception as e:
-        s["rag_status"] = "failed"
-        s["rag_error"] = str(e)
+        RAG_GRAPH.update_state(config, {"status": "failed", "error": str(e), "keyword": None, "cases": []})
 
 
 def _progress_from_session(s: dict) -> dict:
@@ -136,92 +140,37 @@ def _progress_from_session(s: dict) -> dict:
 
 
 def _send_to_session(session_id: str, message: str) -> dict:
-    s = SESSIONS.get(session_id)
-    if not s:
-        raise HTTPException(404, "세션을 찾을 수 없습니다. /chat/init 먼저 호출하세요.")
+    state = _session(session_id)
+    request = {"action": "message", "message": message, "offense": _offense_from_rag(session_id, state)}
 
-    offense = s["offense"]
-    meta = get_offense_meta(offense)
-
-    s["history"].append({"role": "user", "content": message})
-    user_text = _user_window(s["history"], max_chars=1800)
-
-    # LLM 호출. 실패하면 이번 발화를 기록에서 빼고 오류로 알린다 (다시 보내면 같은 상태에서 이어진다).
+    # 추출이 실패하면 그래프는 이번 발화를 저장하지 않는다. 오류로 알리고, 다시 보내면 같은 상태에서 이어진다.
     try:
-        parsed = extract_all(user_text, offense)
+        out = CHAT_GRAPH.invoke({"request": request}, chat_config(session_id))
     except StructuredOutputError as e:
-        s["history"].pop()
         print(f"[EXTRACT] 정보 추출 실패 session={session_id} reason={e}")
         raise HTTPException(502, "답변을 처리하지 못했습니다. 잠시 후 다시 보내 주세요.")
-    elements = enforce_elements(meta, parsed.get("elements", {}), user_text)
-    details  = enforce_details(parsed.get("details", {}), offense)
 
-    old_elements = s.get("collected", {}).get("elements", {})
-    for eid, old_rec in old_elements.items():
-        if "_asked_count" in old_rec:
-            elements.setdefault(eid, {})["_asked_count"] = old_rec["_asked_count"]
-
-    old_details = s.get("collected", {}).get("details", {})
-    for did, old_rec in old_details.items():
-        if "_asked_count" in old_rec:
-            details.setdefault(did, {})["_asked_count"] = old_rec["_asked_count"]
-    s["collected"] = {
-        "elements": elements,
-        "details": details,
-    }
-    s["details"] = details
-
-    # 질문 선택
-    reply = pick_detail_followup(details, offense) or pick_element_followup(elements, meta) \
-            or "필수 정보가 충족되었습니다. 고소장을 작성해드릴게요."
-    complete = (reply.startswith("필수 정보가 충족"))
-
-    # 중복 질문 방지
-    last_assistant = next((m for m in reversed(s["history"]) if m["role"] == "assistant"), None)
-    if last_assistant and last_assistant["content"].strip() == reply.strip() and not complete:
-        alt = pick_element_followup(elements, meta) if reply == pick_detail_followup(details, offense) else pick_detail_followup(details, offense)
-        if alt and alt.strip() != reply.strip():
-            reply = alt
-
-    s["history"].append({"role": "assistant", "content": reply})
-
-    # 위험요소 정규식판별
-    caution_msg = classify_need_caution("\n".join(m["content"] for m in s["history"] if m["role"]=="user"))
-
+    collected = out["collected"]
     return {
         "session_id": session_id,
-        "reply": reply,
-        "caution": bool(caution_msg),
-        "progress": {"complete": complete, "elements": elements, "details": details},
+        "reply": out["reply"],
+        "caution": out["caution"],
+        "progress": {"complete": out["complete"], "elements": collected["elements"], "details": collected["details"]},
     }
 
 @app.post("/chat/init")
-def chat_init(req: ChatInitRequest, background_tasks: BackgroundTasks):  
+def chat_init(req: ChatInitRequest, background_tasks: BackgroundTasks):
     sid = str(uuid4())
-    SESSIONS[sid] = _build_session(req.text, req.offense)
+    state = _create_session(sid, req.text, req.offense)
     background_tasks.add_task(_load_rag_preview, sid, req.text)
 
-    return {
-        "session_id": sid,
-        "offense": SESSIONS[sid]["offense"],
-        "rag_status": SESSIONS[sid]["rag_status"],
-        "rag_keyword": SESSIONS[sid]["rag_keyword"], #str
-        "rag_cases": SESSIONS[sid]["rag_cases"], #list[dict] {case_no, label, text}
-    }
+    return {"session_id": sid, "offense": state["offense"], **_rag(sid)}
 
 
 @app.get("/chat/rag/{session_id}")
 def chat_rag(session_id: str):
-    s = SESSIONS.get(session_id)
-    if not s:
-        raise HTTPException(404, "세션을 찾을 수 없습니다. /chat/init 먼저 호출하세요.")
-
-    return {
-        "session_id": session_id,
-        "rag_status": s.get("rag_status", "pending"),
-        "rag_keyword": s.get("rag_keyword"),
-        "rag_cases": s.get("rag_cases") or [],
-    }
+    _session(session_id)
+    return {"session_id": session_id, **_rag(session_id)}
 
 
 @app.post("/chat/send")
@@ -241,7 +190,7 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
         raise HTTPException(400, "복원할 사용자 메시지가 없습니다.")
 
     sid = str(uuid4())
-    SESSIONS[sid] = _build_session(user_messages[0])
+    state = _create_session(sid, user_messages[0])
     background_tasks.add_task(_load_rag_preview, sid, user_messages[0])
 
     last_response = None
@@ -250,24 +199,20 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
             last_response = _send_to_session(sid, message)
     except HTTPException:
         # 복원 중 실패하면 반쯤 만든 세션을 남기지 않는다. 클라이언트는 session_id를 받지 못한다.
-        SESSIONS.pop(sid, None)
+        delete_session(sid)
         raise
 
     return {
         "session_id": sid,
-        "offense": SESSIONS[sid]["offense"],
-        "rag_status": SESSIONS[sid]["rag_status"],
-        "rag_keyword": SESSIONS[sid]["rag_keyword"],
-        "rag_cases": SESSIONS[sid]["rag_cases"],
-        "progress": last_response["progress"] if last_response else _progress_from_session(SESSIONS[sid]),
+        "offense": state["offense"],
+        **_rag(sid),
+        "progress": last_response["progress"] if last_response else _progress_from_session(state),
     }
+
 
 @app.post("/chat/compose")
 def chat_compose(req: ComposeRequest):
-    s = SESSIONS.get(req.session_id)
-    if not s:
-        raise HTTPException(404, "세션을 찾을 수 없습니다. /chat/init 먼저 호출하세요.")
-    meta = get_offense_meta(s["offense"])
-
-    sections_payload = compose_complaint(meta=meta, collected=s.get("collected", {}), evidence=[])
-    return sections_payload
+    state = _session(req.session_id)
+    request = {"action": "compose", "offense": _offense_from_rag(req.session_id, state)}
+    out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
+    return out["draft"]

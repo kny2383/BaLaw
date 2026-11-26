@@ -22,6 +22,18 @@ from fastapi.testclient import TestClient  # noqa: E402
 import baroai  # noqa: E402
 import services.openai_client as openai_client  # noqa: E402
 import services.rag as rag  # noqa: E402
+from flow import checkpoint  # noqa: E402
+
+
+def _clear_sessions():
+    for sid in checkpoint.session_ids():
+        checkpoint.delete_session(sid)
+
+
+@pytest.fixture
+def session_ids():
+    """지금 저장된 세션 ID 목록을 돌려주는 함수."""
+    return checkpoint.session_ids
 
 
 @pytest.fixture(autouse=True)
@@ -36,9 +48,9 @@ def _no_real_openai():
 def fake(monkeypatch):
     _fake.reset()
     monkeypatch.setattr(rag, "get_collection", lambda: FakeCollection())
-    baroai.SESSIONS.clear()
+    _clear_sessions()
     yield _fake
-    baroai.SESSIONS.clear()
+    _clear_sessions()
 
 
 @pytest.fixture

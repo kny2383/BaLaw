@@ -195,9 +195,8 @@ def test_restore_without_user_message(client):
     assert r.status_code == 400
 
 
-def test_restore_failure_leaves_no_session(client, fake):
-    import baroai
+def test_restore_failure_leaves_no_session(client, fake, session_ids):
     fake.fail_extract = True
     history = [{"role": "user", "content": NARRATIVE}, {"role": "user", "content": "네"}]
     assert client.post("/chat/restore", json={"history": history}).status_code == 502
-    assert baroai.SESSIONS == {}
+    assert session_ids() == []
