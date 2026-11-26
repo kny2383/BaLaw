@@ -524,6 +524,8 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     # 사용자 확인 (서비스가 DRAFT_CONFIRM=1일 때만 값이 생긴다)
     rounds = [rnd for r in results for rnd in r.get("confirm") or []]
     s["confirm_cases"] = sum(1 for r in results if r.get("confirm"))
+    # 참이면 M1의 근거에 사용자의 확인 답이 들어 있다. 확인을 끈 실행의 M1과 같은 척도가 아니다.
+    s["M1_basis_includes_confirmation"] = bool(rounds)
     s["confirm_asked_total"] = sum(len(rnd["answers"]) for rnd in rounds)
     s["confirm_yes_total"] = sum(sum(rnd["answers"]) for rnd in rounds)
     s["confirm_user_cost_usd"] = round(sum(price_cost(rnd["model"], rnd["usage"], prices, missing_prices) or 0
