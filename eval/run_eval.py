@@ -65,6 +65,20 @@ JUDGE_SCHEMA = {
     },
 }
 
+# 모의 사용자의 확인 답 (서비스가 DRAFT_CONFIRM=1일 때). 초안의 표현이 사용자가 겪은 사실인지 답한다.
+# 사용자가 아는 것은 사례의 처음 서술과 모든 항목의 정답이다. 대화에서 묻지 않아 말하지 않은 것도 포함한다.
+CONFIRM_MAX_ROUNDS = 3
+CONFIRM_SYSTEM = (
+    "당신은 고소장을 쓰려는 사용자다. [내가 겪은 일]이 당신이 아는 전부다. "
+    "고소장 초안의 표현을 하나씩 보고, 그 표현이 말하는 사실이 당신이 겪은 일이 맞는지 답한다."
+)
+CONFIRM_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["answers"],
+    "properties": {"answers": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False, "required": ["n", "true", "basis"],
+        "properties": {"n": {"type": "integer"}, "true": {"type": "boolean"}, "basis": {"type": "string"}}}}},
+}
+
 
 # ---------------------------------------------------------------- HTTP
 
@@ -133,7 +147,42 @@ def judge_transcript(r: dict) -> str:
             lines.append(f"[AI 질문 {k + 1}] {t['reply']}")
         if k + 1 < len(turns) and turns[k + 1].get("sent"):
             lines.append(f"[사용자 답 {k + 1}] {turns[k + 1]['sent']}")
+    # 초안의 표현이 사실이냐는 물음에 맞다고 답한 것도 사용자가 한 말이다.
+    for quote in confirmed_quotes(r):
+        lines.append(f"[사용자 확인] 초안의 다음 내용이 사실이 맞느냐는 물음에 사용자가 맞다고 답함: {quote}")
     return "\n".join(lines)
+
+
+def confirmed_quotes(r: dict) -> list[str]:
+    return [c["quote"] for rnd in r.get("confirm") or [] for c, yes in zip(rnd["claims"], rnd["answers"]) if yes]
+
+
+def user_knowledge(case: dict) -> str:
+    """모의 사용자가 아는 것 전부: 처음 서술과 모든 항목의 정답 (묻지 않은 항목 포함)."""
+    lines = [f"- {case['narrative']}"]
+    lines += [f"- ({slot}) {g['answer']}" for slot, g in case["slots"].items() if (g.get("answer") or "").strip()]
+    return "\n".join(lines)
+
+
+def confirm_prompt(case: dict, claims: list[dict], draft: str) -> str:
+    return ("[내가 겪은 일]\n" + user_knowledge(case) +
+            "\n\n[고소장 초안] (표현이 놓인 문맥을 보는 용도다. 초안에 적혀 있다는 것은 근거가 아니다)\n" + draft +
+            "\n\n[초안의 표현]\n" + "\n".join(f"{i + 1}. {c['quote']}" for i, c in enumerate(claims)) +
+            "\n\n[답하는 방법]\n"
+            "표현마다 n(번호), true, basis(근거가 된 내 말, 없으면 빈 문자열)를 적는다. 번호 순서대로 모두 답한다.\n"
+            "true: 그 표현의 사실이 [내가 겪은 일]에 있거나 거기서 바로 따라 나온다.\n"
+            "false: [내가 겪은 일]에 없거나 반대된다. 내가 모른다고 한 것을 있다 또는 없다로 단정한 표현, "
+            "내가 말하지 않은 피해의 정도·감정·세부가 들어간 표현은 false다. 그럴듯해 보여도 겪은 일에 없으면 false다.")
+
+
+def answer_confirmation(case: dict, claims: list[dict], draft: str, model: str) -> dict:
+    """모의 사용자의 확인 답 한 차례. 실패하면 JudgeError가 올라간다 (임의의 답으로 바꾸지 않는다)."""
+    j = judge("openai", model, CONFIRM_SYSTEM, confirm_prompt(case, claims, draft), CONFIRM_SCHEMA)
+    got = sorted(j.data.get("answers") or [], key=lambda a: a.get("n", 0))
+    if [a.get("n") for a in got] != list(range(1, len(claims) + 1)):
+        raise JudgeError(f"확인 답의 번호가 맞지 않는다: {[a.get('n') for a in got]}")
+    return {"claims": claims, "answers": [bool(a["true"]) for a in got], "basis": [a["basis"] for a in got],
+            "model": j.response_model or model, "usage": j.usage, "latency_s": j.latency_s}
 
 
 def judge_prompt(r: dict) -> str:
@@ -141,7 +190,8 @@ def judge_prompt(r: dict) -> str:
             "\n\n[고소장 초안]\n" + r["draft"] +
             "\n\n[판정 기준]\n"
             "대화 기록은 처음 서술, AI 질문, 사용자 답 전체다. 사용자 답은 바로 앞 AI 질문에 대한 답으로 읽는다. "
-            "AI 질문 안의 요약이나 예시는 사용자가 한 말이 아니다.\n"
+            "AI 질문 안의 요약이나 예시는 사용자가 한 말이 아니다.\n" +
+            ("[사용자 확인]은 사용자가 한 말이다.\n" if confirmed_quotes(r) else "") +
             "fabricated: 사용자가 한 말(처음 서술과 사용자 답) 어디에도 근거가 없는 구체적 사실만 넣는다. "
             "날짜, 시각, 금액, 이름·닉네임, 계좌, 장소, 연락처, 행위, 발언, 피해 내용, 증거 보유 여부가 대상이다. "
             "사용자가 한 말과 반대되는 내용도 넣는다. 특히 다음은 넣는다:\n"
@@ -254,6 +304,22 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
     # 초안 생성
     st, comp, lat = http("POST", f"{ai}/chat/compose", {"session_id": sid})
     out["compose"] = {"status": st, "latency_s": round(lat, 3), "body": comp}
+    # 서비스가 사용자 확인을 기다리면 모의 사용자가 답하고 이어 간다.
+    for _ in range(CONFIRM_MAX_ROUNDS):
+        review = (comp or {}).get("verification") if st == 200 and isinstance(comp, dict) else None
+        if not isinstance(review, dict) or review.get("status") != "awaiting_confirmation":
+            break
+        try:
+            shown = "\n\n".join(v for v in (comp.get("sections") or {}).values() if isinstance(v, str))
+            rnd = answer_confirmation(case, review.get("to_confirm") or [], shown, judge_cfg["confirm_model"])
+        except JudgeError as e:
+            out["errors"].append(f"확인 답 실패: {e}")
+            break
+        out.setdefault("confirm", []).append(rnd)
+        st, comp, lat = http("POST", f"{ai}/chat/compose/confirm", {"session_id": sid, "answers": rnd["answers"]})
+        out["compose"] = {"status": st, "latency_s": round(out["compose"]["latency_s"] + lat, 3), "body": comp}
+    else:
+        out["errors"].append(f"확인이 {CONFIRM_MAX_ROUNDS}차례 안에 끝나지 않았다")
     draft = ""
     if st == 200 and isinstance(comp, dict):
         sections = comp.get("sections") if isinstance(comp.get("sections"), dict) else {}
@@ -451,6 +517,13 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["verification_status"] = {k: sum(1 for v in review if v.get("status") == k)
                                 for k in sorted({v.get("status") for v in review})}
     s["verification_removed_total"] = sum(len(v.get("removed") or []) for v in review)
+    # 사용자 확인 (서비스가 DRAFT_CONFIRM=1일 때만 값이 생긴다)
+    rounds = [rnd for r in results for rnd in r.get("confirm") or []]
+    s["confirm_cases"] = sum(1 for r in results if r.get("confirm"))
+    s["confirm_asked_total"] = sum(len(rnd["answers"]) for rnd in rounds)
+    s["confirm_yes_total"] = sum(sum(rnd["answers"]) for rnd in rounds)
+    s["confirm_user_cost_usd"] = round(sum(price_cost(rnd["model"], rnd["usage"], prices, missing_prices) or 0
+                                           for rnd in rounds), 4)
     s["M11_service_cost_usd"] = round(sum(v["cost_usd"] for v in s["M11_by_kind"].values()), 4)
     send_lat = [t["latency_s"] for r in convo for t in r["turns"] if "latency_s" in t]
     s["M11_turn_latency_p50_s"] = round(statistics.median(send_lat), 1) if send_lat else None
@@ -518,6 +591,8 @@ def main() -> int:
     ap.add_argument("--proxy-url", default="http://localhost:8090")
     ap.add_argument("--judge-provider", default=os.environ.get("EVAL_JUDGE_PROVIDER", "openai"))
     ap.add_argument("--judge-model", default=os.environ.get("EVAL_JUDGE_MODEL", "gpt-5-2025-08-07"))
+    ap.add_argument("--confirm-model", default=os.environ.get("EVAL_CONFIRM_MODEL", "gpt-5-mini"),
+                    help="서비스가 사용자 확인을 기다릴 때 모의 사용자의 답을 만드는 모델")
     ap.add_argument("--flush-cache", action="store_true", help="실행 전 Redis 판례 요약 캐시를 비운다")
     args = ap.parse_args()
 
@@ -553,7 +628,7 @@ def main() -> int:
     run_dir = ROOT / "runs" / args.run_id
     (run_dir / "cases").mkdir(parents=True, exist_ok=True)
     started = time.time()
-    judge_cfg = {"provider": args.judge_provider, "model": args.judge_model}
+    judge_cfg = {"provider": args.judge_provider, "model": args.judge_model, "confirm_model": args.confirm_model}
     results = []
     print(f"[{args.run_id}] 사례 {len(cases)}건, 동시 {args.concurrency}, 판정 {judge_cfg}", flush=True)
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
