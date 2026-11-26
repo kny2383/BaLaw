@@ -90,6 +90,7 @@ def main() -> int:
 
 
 def run(args, calls, out_dir, failed, get_offense_meta, compose_complaint) -> None:
+    used: set[int] = set()  # 한 작성 요청을 두 사례가 쓰지 않게 한다
     for f in sorted((ROOT / "runs" / args.src / "cases").glob("*.json")):
         r = json.loads(f.read_text(encoding="utf-8"))
         if (args.only and r["id"] not in args.only) or not r.get("draft") or (out_dir / f.name).exists():
@@ -99,10 +100,11 @@ def run(args, calls, out_dir, failed, get_offense_meta, compose_complaint) -> No
         def score(c):
             return difflib.SequenceMatcher(None, (c.get("response_text") or "")[:400], r["draft"][:400]).ratio()
         call = max(calls, key=score)
-        if score(call) < 0.5:
-            print(f"{r['id']}: 원래 작성 요청을 찾지 못함", flush=True)
+        if score(call) < 0.5 or id(call) in used:
+            print(f"{r['id']}: 원래 작성 요청을 찾지 못함 (닮은 요청이 없거나 다른 사례가 이미 쓴 요청)", flush=True)
             failed.append(r["id"])
             continue
+        used.add(id(call))
         proxy_control({"case_id": r["id"]})
         t0 = time.time()
         try:
