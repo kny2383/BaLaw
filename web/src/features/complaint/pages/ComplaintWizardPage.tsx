@@ -110,6 +110,8 @@ const ComplaintWizardPage: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<RagCase | null>(null);
 
   const [showGeneratingModal, setShowGeneratingModal] = useState(false);
+  // 생성 요청이 진행 중인지. 완료 신호가 겹쳐 들어와도 요청은 한 번만 보낸다
+  const generatingRef = useRef(false);
 
   // 초안에서 사용자 확인이 필요한 표현 (없으면 null)
   const [claimsToConfirm, setClaimsToConfirm] = useState<DraftClaim[] | null>(null);
@@ -272,6 +274,9 @@ const ComplaintWizardPage: React.FC = () => {
     // 6: 채팅 완료 후 → 최종 고소장 생성 + 미리보기(7)
     if (step === 6) {
       if (!complaintId) return;
+      // 두 번째 요청은 첫 번째가 기다리던 확인을 버리게 만든다
+      if (generatingRef.current) return;
+      generatingRef.current = true;
 
       // 버튼 누르는 즉시 모달 띄우기
       setShowGeneratingModal(true);
@@ -301,6 +306,7 @@ const ComplaintWizardPage: React.FC = () => {
         setIsGenerating(false);
       } finally {
         setIsGenerating(false);
+        generatingRef.current = false;
       }
 
       return;

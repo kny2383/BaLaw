@@ -88,7 +88,7 @@ const DraftConfirmModal: React.FC<DraftConfirmModalProps> = ({
                       className={[
                         'text-body-3-regular rounded-lg border px-4 py-2 transition-colors disabled:opacity-60',
                         selected
-                          ? 'border-primary-400 bg-primary-0 text-primary-600'
+                          ? 'border-primary-400 bg-primary-400 text-neutral-0'
                           : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300',
                       ].join(' ')}
                     >
