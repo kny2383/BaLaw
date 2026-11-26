@@ -262,8 +262,9 @@ def summarize_single_case(case: dict) -> dict:
 
 def _normalize_case_summary(fallback: dict, data: dict) -> dict:
     return {
-        "case_no": data.get("case_no") or fallback.get("case_no", ""),
-        "label": data.get("label") or fallback.get("label", ""),
+        # 사건번호와 죄명은 검색 결과의 값을 쓴다. LLM이 돌려준 값은 쓰지 않는다 (다른 번호를 적을 수 있다).
+        "case_no": fallback.get("case_no", ""),
+        "label": fallback.get("label", ""),
         "summary": (data.get("summary") or "").strip()
         or fallback.get("summary", "")[:200]
         or fallback.get("facts", "")[:200],

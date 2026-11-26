@@ -56,3 +56,10 @@ def test_keyword_candidates_that_matter_still_find_cases():
     """죄명 키워드와 판례 라벨의 죄명이 같은 말로 끝나야 걸린다. 지원 죄목과 평가 사례의 죄명으로 확인한다."""
     assert rag.is_crime("사기", "사기") and rag.is_crime("모욕", "모욕") and rag.is_crime("명예 훼손", "명예훼손")
     assert not rag.is_crime("사기", "컴퓨터등사용사기"), "더 좁은 죄명을 찾을 때 넓은 죄명의 판례는 고르지 않는다"
+
+
+def test_summary_keeps_the_retrieved_case_number_and_label():
+    """LLM이 다른 사건번호나 죄명을 돌려줘도 검색 결과의 값을 쓴다."""
+    case = {"case_no": "2020도1", "label": "사기", "summary": "", "facts": "사실"}
+    out = rag._normalize_case_summary(case, {"case_no": "9999도9999", "label": "살인", "summary": "요약", "result": "유죄"})
+    assert out == {"case_no": "2020도1", "label": "사기", "summary": "요약", "result": "유죄"}
