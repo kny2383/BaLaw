@@ -12,12 +12,15 @@ import type { RagCase } from '@/features/complaint/apis/complaints';
 import { createComplaint } from '@/features/complaint/apis/complaints';
 import {
   type AccusedInfoCreate,
+  type DraftClaim,
   type EvidenceCreate,
+  confirmGenerated,
   generateFinal,
   registerAccused,
   registerEvidence,
   registerRelatedCases,
 } from '@/features/complaint/apis/complaints';
+import DraftConfirmModal from '@/features/complaint/components/DraftConfirmModal';
 import WizardNavButtons from '@/features/complaint/components/WizardNavButtons';
 import WizardProgress from '@/features/complaint/components/WizardProgress';
 import AccusedInfoSection, {
@@ -107,6 +110,36 @@ const ComplaintWizardPage: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<RagCase | null>(null);
 
   const [showGeneratingModal, setShowGeneratingModal] = useState(false);
+
+  // 초안에서 사용자 확인이 필요한 표현 (없으면 null)
+  const [claimsToConfirm, setClaimsToConfirm] = useState<DraftClaim[] | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  // 확인을 물은 횟수. 같은 표현을 다시 물어도 창을 새로 만들어 이전 답이 남지 않게 한다
+  const [confirmRound, setConfirmRound] = useState(0);
+
+  const handleConfirmSubmit = async (answers: boolean[]) => {
+    if (!complaintId) return;
+    setIsConfirming(true);
+    setConfirmError(null);
+    try {
+      const res = await confirmGenerated(complaintId, answers);
+      if (res.to_confirm.length > 0) {
+        // 고쳐 쓴 초안에서 다시 확인할 표현이 나왔다
+        setClaimsToConfirm(res.to_confirm);
+        setConfirmRound((n) => n + 1);
+        return;
+      }
+      setGeneratedComplaint(res.generated_complaint);
+      setClaimsToConfirm(null);
+      nextRaw();
+    } catch (e) {
+      console.error('failed to confirm draft', e);
+      setConfirmError('답변을 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   /** 나가기 버튼 */
   const handleExit = () => {
@@ -246,12 +279,20 @@ const ComplaintWizardPage: React.FC = () => {
 
       try {
         const res = await generateFinal(complaintId);
-        setGeneratedComplaint(res.generated_complaint);
 
         // 응답 오면 모달 닫고 다음 단계로 이동
         setShowGeneratingModal(false);
         setIsGenerating(false);
 
+        if (res.to_confirm.length > 0) {
+          // 확인이 끝나야 초안이 완성된다. 미리보기로 넘어가지 않고 먼저 묻는다.
+          setConfirmError(null);
+          setClaimsToConfirm(res.to_confirm);
+          setConfirmRound((n) => n + 1);
+          return;
+        }
+
+        setGeneratedComplaint(res.generated_complaint);
         nextRaw(); // → step 9 (ComplaintPreviewSection)
       } catch (e) {
         console.error('failed to generate complaint', e);
@@ -617,6 +658,16 @@ const ComplaintWizardPage: React.FC = () => {
           />
         )}
         <GeneratingModal open={showGeneratingModal} />
+        {claimsToConfirm && (
+          <DraftConfirmModal
+            key={confirmRound}
+            claims={claimsToConfirm}
+            isSubmitting={isConfirming}
+            errorMessage={confirmError}
+            onSubmit={handleConfirmSubmit}
+            onClose={() => setClaimsToConfirm(null)}
+          />
+        )}
       </main>
       <Footer />
 

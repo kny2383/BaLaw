@@ -135,24 +135,49 @@ export async function sendChat(complaintId: number, aiSessionId: string, message
   return res.data as { reply: string; reason?: string | null };
 }
 
-/** 최종 고소장 생성 */
-export async function generateFinal(complaintId: number) {
-  const res = await api.post(`${BASE_URL}/complaints/${complaintId}/generate`);
-  const data = res.data as {
-    complaint_id: number;
-    criminal_facts: string;
-    accusation_reason: string;
-    status: 'completed';
-  };
+/** 초안에서 대화로 확인되지 않은 표현 */
+export type DraftClaim = { quote: string; reason?: string };
 
-  // 위자드에서 쓰기 편하게 가공해서 리턴
+type GenerateResponse = {
+  complaint_id: number;
+  criminal_facts: string;
+  accusation_reason: string;
+  // awaiting_confirmation이면 초안은 아직 저장되지 않았다. to_confirm에 답해야 완성된다.
+  status: 'completed' | 'awaiting_confirmation';
+  verification?: { status: string; to_confirm?: DraftClaim[] } | null;
+};
+
+// 위자드에서 쓰기 편하게 가공해서 리턴
+function toGenerateResult(data: GenerateResponse) {
+  const toConfirm =
+    data.status === 'awaiting_confirmation' ? (data.verification?.to_confirm ?? []) : [];
+  // 확인을 기다린다는데 물을 표현이 없으면 완성된 것으로 넘기지 않는다 (서버에 저장된 초안이 없다)
+  if (data.status !== 'completed' && toConfirm.length === 0) {
+    throw new Error(`고소장이 완성되지 않았습니다: ${data.status}`);
+  }
   return {
     complaint_id: data.complaint_id,
     status: data.status,
     criminal_facts: data.criminal_facts,
     accusation_reason: data.accusation_reason,
     generated_complaint: `[범죄 사실]\n${data.criminal_facts}\n\n[고소 이유]\n${data.accusation_reason}`,
+    // 사용자에게 확인받을 표현. 비어 있으면 완성된 것이다.
+    to_confirm: toConfirm,
   };
+}
+
+/** 최종 고소장 생성 */
+export async function generateFinal(complaintId: number) {
+  const res = await api.post(`${BASE_URL}/complaints/${complaintId}/generate`);
+  return toGenerateResult(res.data as GenerateResponse);
+}
+
+/** 확인을 요청받은 표현에 답해 고소장을 완성한다. answers는 to_confirm과 같은 순서 (true = 사실이 맞다) */
+export async function confirmGenerated(complaintId: number, answers: boolean[]) {
+  const res = await api.post(`${BASE_URL}/complaints/${complaintId}/generate/confirm`, {
+    answers,
+  });
+  return toGenerateResult(res.data as GenerateResponse);
 }
 
 /** DOCX 고소장 다운로드 */
