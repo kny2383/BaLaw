@@ -124,7 +124,13 @@ def _load_rag_preview(session_id: str, text: str) -> None:
     try:
         RAG_GRAPH.invoke({"text": text}, config)
     except Exception as e:
-        RAG_GRAPH.update_state(config, {"status": "failed", "error": str(e), "keyword": None, "cases": []})
+        # 어느 단계에서 실패했든 마지막 노드의 결과로 실패 상태를 남긴다 (실행을 이어 가지 않는다).
+        print(f"[RAG] 판례 검색 실패 session={session_id} reason={type(e).__name__}")
+        RAG_GRAPH.update_state(
+            config,
+            {"status": "failed", "error": str(e), "keyword": None, "cases": []},
+            as_node="summarize_cases",
+        )
 
 
 def _progress_from_session(s: dict) -> dict:

@@ -9,6 +9,9 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 RAG_THREAD_PREFIX = "rag:"
 
+# 메모리 체크포인터는 thread마다 단계별 상태 사본을 모두 보관한다. 세션당 최신 상태 하나만 두던
+# 이전보다 메모리를 더 쓰고, 서비스가 재시작하면 비워진다. 저장소를 PostgreSQL로 바꿀 때
+# 세션 삭제와 함께 정리 방법을 정한다.
 _checkpointer = InMemorySaver()
 
 
