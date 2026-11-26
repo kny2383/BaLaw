@@ -84,7 +84,7 @@ python3 eval/rejudge.py --from baseline-1 --run-id baseline-1-judge-v2
 python3 eval/run_eval.py --run-id try-1 --only $(grep -v '^#' eval/subsets/dev10.txt)
 ```
 
-정보 추출 호출의 추론 강도를 바꿔 비교하기. 값은 `minimal`, `low`, `medium`, `high`이고 비우면 모델 기본값이다. 실제로 실린 값은 결과의 `extract_reasoning_effort`에 나온다.
+정보 추출 호출의 추론 강도를 바꿔 비교하기. 값은 `minimal`, `low`, `medium`, `high`이고 비우면 서비스 기본값(`low`)이다. 실제로 실린 값은 결과의 `extract_reasoning_effort`에 나온다.
 
 ```bash
 EVAL_EXTRACT_REASONING_EFFORT=low docker compose -f compose.yaml -f compose.eval.yaml up -d --build ai
