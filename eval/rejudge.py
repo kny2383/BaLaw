@@ -59,7 +59,7 @@ def main() -> int:
         raise SystemExit("다시 판정할 사례가 없다 (초안이 있는 사례만 대상)")
 
     ev.load_openai_key()
-    prices = json.loads((ROOT / "prices.json").read_text(encoding="utf-8"))
+    prices = json.loads((ROOT.parent / "ai" / "prices.json").read_text(encoding="utf-8"))
     before = m1_summary(sources, prices)
     print(f"[{args.run_id}] {args.src}의 {len(sources)}건 다시 판정. 이전 판정 비용 {before['judge_cost_usd']}달러", flush=True)
 

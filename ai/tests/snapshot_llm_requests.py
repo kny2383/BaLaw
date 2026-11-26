@@ -2,6 +2,7 @@
 
 호출 계층을 바꾸는 구조 변경에서 "요청이 이전과 같다"를 확인하는 기준이다.
 기준 파일을 다시 만들 때:  python -m tests.snapshot_llm_requests tests/fixtures/llm_requests.json
+이때 작업별 프롬프트 판본(prompt_versions.json)도 함께 다시 만든다. 프롬프트나 출력 형식을 바꾸면 판본이 바뀐다.
 """
 from __future__ import annotations
 
@@ -49,4 +50,8 @@ if __name__ == "__main__":
 
     data = collect(TestClient(baroai.app), c._fake)
     Path(sys.argv[1]).write_text(json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    print("저장:", sys.argv[1], sorted(data))
+    import services.llm as llm
+    versions = {task: llm.prompt_version_of(body) for task, body in data.items()}
+    (Path(llm.__file__).resolve().parent.parent / "prompt_versions.json").write_text(
+        json.dumps(versions, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print("저장:", sys.argv[1], versions)

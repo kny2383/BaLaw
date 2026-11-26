@@ -36,9 +36,47 @@ def test_every_call_is_recorded_without_content(client, fake):
     for rec in llm.RECENT:
         assert rec["ok"] is True and rec["provider"] == "openai" and rec["model"] == "gpt-5-mini"
         assert rec["input_tokens"] == 1 and rec["output_tokens"] == 1 and rec["latency_s"] >= 0
-        assert set(rec) == {"task", "provider", "model", "response_model", "input_tokens", "output_tokens",
-                            "reasoning_tokens", "latency_s", "ok", "error"}
+        assert set(rec) == {"task", "provider", "model", "response_model", "prompt_version", "input_tokens",
+                            "cached_tokens", "output_tokens", "reasoning_tokens", "cost_usd", "latency_s", "ok", "error"}
+        assert rec["prompt_version"] == llm.PROMPT_VERSIONS[rec["task"]]
+        assert rec["cost_usd"] == pytest.approx((0.25 + 2.00) / 1e6)  # gpt-5-mini 입력 1토큰 + 출력 1토큰
     assert "30만원" not in json.dumps(list(llm.RECENT), ensure_ascii=False)
+
+
+def test_prompt_versions_match_the_stored_requests():
+    """판본은 기준 요청에서 나온다. 프롬프트를 바꿔 기준 요청을 다시 만들면 판본도 함께 바뀌어야 한다."""
+    before = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    assert llm.PROMPT_VERSIONS == {task: llm.prompt_version_of(body) for task, body in before.items()}
+    assert len(set(llm.PROMPT_VERSIONS.values())) == len(llm.TASKS)
+
+
+def test_prompt_version_follows_the_prompt_not_the_model():
+    body = {"model": "a", "messages": [{"role": "user", "content": "규칙 1"}]}
+    assert llm.prompt_version_of(body) == llm.prompt_version_of({**body, "model": "b", "reasoning_effort": "low"})
+    assert llm.prompt_version_of(body) != llm.prompt_version_of({**body, "messages": [{"role": "user", "content": "규칙 2"}]})
+    assert llm.prompt_version_of(body) != llm.prompt_version_of({**body, "response_format": {"type": "json_object"}})
+
+
+def test_cost_uses_the_price_table():
+    # gpt-5-mini: 입력 0.25, 캐시된 입력 0.025, 출력 2.00 (100만 토큰당 달러)
+    assert llm.cost_usd("compose", "gpt-5-mini", 1000, 0, 500) == pytest.approx((1000 * 0.25 + 500 * 2.00) / 1e6)
+    assert llm.cost_usd("compose", "gpt-5-mini-2025-08-07", 1000, 400, 500) == pytest.approx(
+        (600 * 0.25 + 400 * 0.025 + 500 * 2.00) / 1e6)
+
+
+def test_cost_is_unknown_rather_than_zero_when_it_cannot_be_computed(fake, task_settings):
+    assert llm.cost_usd("compose", "model-without-price", 1000, 0, 500) is None
+    assert llm.cost_usd("compose", "gpt-5-mini", None, None, None) is None
+    # 실패한 호출은 토큰 수가 없다.
+    fake.fail_compose = True
+    with pytest.raises(llm.LLMCallError):
+        llm.text("compose", "본문", system="You are a drafting assistant")
+    assert llm.RECENT[-1]["cost_usd"] is None and llm.RECENT[-1]["prompt_version"] == llm.PROMPT_VERSIONS["compose"]
+    # 다른 서버로 보낸 작업은 모델 이름이 같아도 단가가 다르므로 계산하지 않는다.
+    fake.fail_compose = False
+    task_settings(base_urls={"compose": fake.base_url})
+    llm.text("compose", "본문", system="You are a drafting assistant")
+    assert llm.RECENT[-1]["ok"] is True and llm.RECENT[-1]["cost_usd"] is None
 
 
 def test_failed_call_is_recorded_and_raised(fake):
