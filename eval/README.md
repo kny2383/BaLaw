@@ -58,6 +58,7 @@ python3 eval/run_eval.py --run-id try-1 --only fraud-used-goods-01 vague-01   # 
 - 실행 전에 AI를 한 번 예열하고, `--flush-cache`면 판례 요약 캐시를 비운다.
 - 판정 기준 판본은 `run_eval.py`의 `JUDGE_VERSION`이다 (지금 2판). 판본이 다른 M1·M8은 비교하지 않는다.
 - 판정 모델은 `--judge-provider`, `--judge-model`로 고른다. 기본은 `openai/gpt-5-2025-08-07`. 키는 환경 변수가 없으면 `ai/.env`에서 읽는다.
+- **사용자 확인**: 서비스를 `EVAL_DRAFT_CONFIRM=1`로 띄우면 작성이 검증에서 멈추고 확인을 기다린다. 모의 사용자가 표현마다 사실인지 답하고(`--confirm-model`, 기본 `gpt-5-mini`) 서비스가 이어 간다. 모의 사용자가 아는 것은 사례의 처음 서술과 모든 항목의 정답이다. 대화에서 묻지 않아 말하지 않은 정답도 포함한다. 맞다고 답한 표현은 판정 기록에 사용자가 한 말로 들어간다. 확인을 켠 실행의 M1은 사용자의 답을 근거로 삼으므로, 끈 실행과 비교할 때 이 차이를 함께 적는다.
 - 결과: `eval/runs/<run-id>/` (사례별 기록, git 제외), `eval/results/<run-id>.md` (요약, 커밋).
 
 2026-11-25 시험 실행 기준 대략의 비용과 시간 (사례 2건):
