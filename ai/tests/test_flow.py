@@ -320,7 +320,8 @@ def test_second_verify_uses_the_confirmation(fake, monkeypatch):
     out = graph.invoke(Command(resume=[True, False]), CONFIG)
     assert _kinds(fake) == ["compose", "verify", "rewrite", "verify"]
     prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
-    assert f"사실이 맞습니다: {SENTENCE}" in prompt  # 구절이 아니라 구절이 든 문장
+    # 같은 문장의 다른 구절(OTHER)은 사실이 아니라고 했으므로, 문장이 아니라 확인한 구절만 사용자의 말이 된다.
+    assert f"사실이 맞습니다: {BAD}\n" in prompt + "\n" and f"사실이 맞습니다: {SENTENCE}" not in prompt
     assert out["review"]["status"] == "rewritten" and out["review"]["rechecked"] is True
 
 
@@ -364,3 +365,18 @@ def test_bullet_mark_is_not_part_of_the_quote(fake, monkeypatch):
     fake.verify_results = [["○ " + SENTENCE]]
     out = _compose(fake, monkeypatch)
     assert out["review"]["removed"] == [{"quote": SENTENCE, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
+
+
+def test_confirmed_phrase_is_recorded_with_its_sentence(fake, monkeypatch):
+    """문장에 확인받지 않은 구절이 없으면, 뜻이 정해지게 문장으로 남긴다."""
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    out = graph.invoke(Command(resume=[True]), CONFIG)
+    assert out["history"][-1]["content"].endswith(f"사실이 맞습니다: {SENTENCE}")
+
+
+def test_unasked_phrase_in_the_same_sentence_is_not_recorded_as_said(fake, monkeypatch):
+    """상한을 넘어 묻지 않은 구절이 같은 문장에 있으면 문장 전체를 사용자의 말로 남기지 않는다."""
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER]], confirm_max=1)
+    out = graph.invoke(Command(resume=[True]), CONFIG)
+    said = next(m["content"] for m in reversed(out["history"]) if m["role"] == "user")
+    assert said.endswith(f"사실이 맞습니다: {BAD}") and SENTENCE not in said

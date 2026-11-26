@@ -154,8 +154,14 @@ def judge_transcript(r: dict) -> str:
 
 
 def confirmed_quotes(r: dict) -> list[str]:
-    return [c.get("sentence") or c["quote"]
-            for rnd in r.get("confirm") or [] for c, yes in zip(rnd["claims"], rnd["answers"]) if yes]
+    # 서비스가 대화 기록에 남기는 것과 같은 규칙: 같은 문장에 사실이 아니라고 한 구절이 있으면 구절만 적는다.
+    out = []
+    for rnd in r.get("confirm") or []:
+        pairs = list(zip(rnd["claims"], rnd["answers"]))
+        denied = {c.get("sentence") for c, yes in pairs if not yes}
+        out += [c["quote"] if c.get("sentence") in denied else (c.get("sentence") or c["quote"])
+                for c, yes in pairs if yes]
+    return out
 
 
 def user_knowledge(case: dict) -> str:
