@@ -251,6 +251,14 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
         return out
     sid = init["session_id"]
 
+    if init.get("offense") == "unsupported":
+        # 서비스가 미지원 죄목으로 답했다. 세션도 판례 검색도 없다.
+        out["rag"] = {"status": "skipped", "keyword": None, "cases": []}
+        if case.get("run_conversation"):
+            out["errors"].append("지원 죄목 사례인데 서비스가 미지원으로 답했다")
+        out["wall_s"] = round(time.time() - t0, 3)
+        return out
+
     # 판례 검색 (비동기) 완료 대기
     rag = {}
     deadline = time.time() + rag_timeout
@@ -474,15 +482,18 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["undetected_question_turns"] = sum(1 for r in convo for t in r["turns"] if t.get("mock"))
 
     # M4, M6
-    kw = [label_match(r.get("rag", {}).get("keyword"), gold[r["id"]]["gold_crime_label"]) for r in results]
+    # 서비스가 미지원으로 답한 사례는 판례 검색을 하지 않으므로 M4와 판례 검색 실패 수에서 뺀다.
+    searched = [r for r in results if r.get("rag", {}).get("status") != "skipped"]
+    kw = [label_match(r.get("rag", {}).get("keyword"), gold[r["id"]]["gold_crime_label"]) for r in searched]
     s["M4_keyword_accuracy"] = pct(sum(kw), len(kw))
+    s["M4_cases"] = len(kw)
     hits = tot = 0
     for r in results:
         for c in r.get("rag", {}).get("cases", []):
             tot += 1
             hits += label_match(primary_label(c.get("label")), gold[r["id"]]["gold_crime_label"])
     s["M6_primary_label_match"] = pct(hits, tot)
-    s["rag_failed"] = sum(1 for r in results if r.get("rag", {}).get("status") != "ready")
+    s["rag_failed"] = sum(1 for r in searched if r.get("rag", {}).get("status") != "ready")
 
     # M5
     uns = [r for r in results if r["expected_offense"] == "unsupported"]

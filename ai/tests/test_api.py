@@ -57,6 +57,16 @@ def test_init_offense_names(client):
     assert _init(client, offense=None)["offense"] in ("fraud", "insult")
 
 
+@pytest.mark.parametrize("offense", ["횡령", "폭행", "명예훼손", "embezzlement", "아무 말"])
+def test_init_unsupported_offense_is_not_turned_into_fraud(client, fake, session_ids, offense):
+    """지원하지 않는 죄목은 사기 양식으로 진행하지 않는다. 세션을 만들지 않고 LLM도 부르지 않는다 (M5)."""
+    r = client.post("/chat/init", json={"text": NARRATIVE, "offense": offense})
+    assert r.status_code == 200
+    assert r.json() == {"session_id": None, "offense": "unsupported", "rag_status": "skipped",
+                        "rag_keyword": None, "rag_cases": []}
+    assert session_ids() == [] and fake.requests == []
+
+
 def test_init_requires_text(client):
     assert client.post("/chat/init", json={"offense": "fraud"}).status_code == 422
 
