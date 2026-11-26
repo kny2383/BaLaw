@@ -30,6 +30,7 @@ class FakeOpenAI:
 
     def __init__(self) -> None:
         self.requests: list[dict] = []
+        self.auth: list[str] = []  # 요청마다 받은 Authorization 헤더
         self.reset()
         handler = self._handler()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -42,6 +43,7 @@ class FakeOpenAI:
 
     def reset(self) -> None:
         self.requests.clear()
+        self.auth.clear()
         self.slot_value = "present"   # 추출 응답의 모든 슬롯 값
         self.item_status = "satisfied"
         self.fail_extract = False     # True면 추출 요청에 400을 돌려준다
@@ -117,6 +119,7 @@ class FakeOpenAI:
                 raw = self.rfile.read(int(self.headers.get("Content-Length", "0")))
                 body = json.loads(raw or b"{}")
                 fake.requests.append({"path": self.path, "body": body})
+                fake.auth.append(self.headers.get("Authorization", ""))
                 if self.path.endswith("/chat/completions"):
                     status, payload = fake._chat(body)
                 else:

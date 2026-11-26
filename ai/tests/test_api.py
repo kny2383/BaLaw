@@ -98,6 +98,12 @@ def test_rag_failure_at_keyword_is_reported(client, fake):
     _assert_rag_failed(client, _init(client)["session_id"])
 
 
+def test_empty_keyword_is_a_failed_search_not_an_unfiltered_one(client, fake):
+    """죄명 키워드가 빈 글로 오면 예전에는 거르지 않은 판례를 보여 줬다. 이제는 실패로 남기고 대화는 이어진다."""
+    fake.keyword = "  "
+    _assert_rag_failed(client, _init(client)["session_id"])
+
+
 def test_rag_failure_at_search_is_reported(client, monkeypatch):
     import services.rag as rag
 

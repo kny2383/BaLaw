@@ -69,6 +69,8 @@ class Settings:
     })
     # 작업별 주소. OpenAI 호환 API를 내는 다른 서버로 보낼 때만 LLM_BASE_URL_<작업>으로 지정한다.
     LLM_BASE_URLS: dict = _per_task("LLM_BASE_URL", {})
+    # 작업별 주소를 쓰는 서버의 키. 주소를 지정한 작업에는 OPENAI_API_KEY를 보내지 않는다.
+    LLM_API_KEYS: dict = _per_task("LLM_API_KEY", {})
     # LLM 호출이 일시적 오류(연결, 시간 초과, 429, 5xx)로 실패했을 때 다시 시도하는 횟수.
     OPENAI_MAX_RETRIES: int = int(os.getenv("OPENAI_MAX_RETRIES", "").strip() or "2")
     # 정보 추출 호출의 추론 강도. 기본값 low의 근거는 eval/results/extract-low-dev10.md.

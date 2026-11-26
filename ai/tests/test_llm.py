@@ -68,9 +68,10 @@ def test_output_that_does_not_fit_the_schema_is_an_error(fake):
 @pytest.fixture
 def task_settings(monkeypatch):
     """작업별 설정을 바꾸고, 끝나면 만들어 둔 모델 객체를 버린다."""
-    def change(models=None, base_urls=None):
+    def change(models=None, base_urls=None, api_keys=None):
         monkeypatch.setattr(settings, "LLM_MODELS", {**settings.LLM_MODELS, **(models or {})})
         monkeypatch.setattr(settings, "LLM_BASE_URLS", {**settings.LLM_BASE_URLS, **(base_urls or {})})
+        monkeypatch.setattr(settings, "LLM_API_KEYS", {**settings.LLM_API_KEYS, **(api_keys or {})})
         llm.reset()
     yield change
     monkeypatch.undo()
@@ -96,6 +97,13 @@ def test_one_task_can_be_sent_to_another_openai_compatible_server(fake, task_set
         assert [r["body"]["model"] for r in other.requests] == ["local-model"] and fake.requests == []
         llm.text("compose", "본문", system="You are a drafting assistant")
         assert len(fake.requests) == 1 and len(other.requests) == 1
+        # 다른 서버에는 OpenAI 키를 보내지 않는다. 기본 주소로 가는 호출에만 보낸다.
+        assert other.auth == ["Bearer not-needed"] and fake.auth == ["Bearer test-key"]
+        # 그 서버의 키를 따로 주면 그 키를 보낸다.
+        task_settings(models={"rag_keyword": "local-model"}, base_urls={"rag_keyword": other.base_url},
+                      api_keys={"rag_keyword": "local-key"})
+        llm.text("rag_keyword", "죄목 리스트 ...")
+        assert other.auth[-1] == "Bearer local-key" and "test-key" not in " ".join(other.auth)
     finally:
         other.close()
 
