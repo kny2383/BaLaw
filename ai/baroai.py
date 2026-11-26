@@ -10,7 +10,7 @@ from cfg import settings
 from flow.chat_graph import build_chat_graph, claims_to_confirm
 from flow.checkpoint import chat_config, delete_session, prune_session, rag_config
 from flow.rag_graph import build_rag_graph, failed_result
-from services import pii
+from services import llm, llm_stats, pii
 from services.llm import LLMCallError, StructuredOutputError
 from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
@@ -70,6 +70,12 @@ class ChatRestoreRequest(BaseModel):
 @app.get("/")
 def health():
     return {"ok": True, "service": app.title, "model": settings.OPENAI_CHAT_MODEL}
+
+
+@app.get("/llm/stats")
+def llm_call_stats():
+    """최근 LLM 호출을 작업별로 모은 수치. 프롬프트와 응답 내용은 들어 있지 않다."""
+    return {"window": llm.RECENT.maxlen, **llm_stats.summarize(llm.recent())}
 
 
 UNSUPPORTED = "unsupported"
