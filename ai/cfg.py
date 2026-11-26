@@ -36,6 +36,14 @@ def _checkpoint_key(name: str) -> bytes:
     return key
 
 
+def _at_least_one(name: str, default: int) -> int:
+    """1 이상의 정수 설정을 읽는다. 0 이하는 시작할 때 막는다."""
+    value = int(os.getenv(name, "").strip() or default)
+    if value < 1:
+        raise ValueError(f"{name}={value}: 1 이상이어야 합니다.")
+    return value
+
+
 class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_COMPOSE_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
@@ -48,7 +56,7 @@ class Settings:
     # 검증이 찾은 표현을 고치기 전에 사용자에게 사실인지 묻는다. 꺼 두면(기본) 묻지 않고 고친다.
     DRAFT_CONFIRM: bool = os.getenv("DRAFT_CONFIRM", "").strip() == "1"
     # 한 번에 묻는 표현 개수의 상한. 넘는 것은 묻지 않고 고친다.
-    DRAFT_CONFIRM_MAX: int = int(os.getenv("DRAFT_CONFIRM_MAX", "").strip() or "5")
+    DRAFT_CONFIRM_MAX: int = _at_least_one("DRAFT_CONFIRM_MAX", 5)
     # 사용자 서술의 식별정보를 표식으로 바꿔 LLM에 보낸다 (S05). 0이면 끈다 (전후 비교용).
     PII_MASKING: bool = os.getenv("PII_MASKING", "").strip() != "0"
     # 대화 상태(체크포인트) 저장소. 비우면 메모리에 두고 서비스가 재시작하면 사라진다.

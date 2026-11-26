@@ -327,3 +327,12 @@ def test_new_request_discards_a_waiting_confirmation(fake, monkeypatch):
     _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD]])
     graph.invoke({"request": {"action": "message", "message": "추가로 말씀드립니다"}}, CONFIG)
     assert graph.get_state(CONFIG).next == ()
+
+
+def test_confirm_limit_must_be_at_least_one(monkeypatch):
+    import cfg
+    monkeypatch.setenv("DRAFT_CONFIRM_MAX", "0")
+    with pytest.raises(ValueError):
+        cfg._at_least_one("DRAFT_CONFIRM_MAX", 5)
+    monkeypatch.setenv("DRAFT_CONFIRM_MAX", "")
+    assert cfg._at_least_one("DRAFT_CONFIRM_MAX", 5) == 5
