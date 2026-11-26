@@ -35,6 +35,23 @@ INTERNAL_BOOTSTRAP_MESSAGES = {
 }
 
 
+# 실패 응답에 넣는 문구. 예외의 원문(내부 주소, AI 서비스의 오류 본문)은 응답에 넣지 않는다.
+FAILURE_MESSAGES = {
+    "AI 서비스 연결 실패": "AI 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "세션 복원 실패": "대화를 이어 가지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "초안 작성 실패": "고소장 초안을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "AI RAG 조회 실패": "판례 검색 결과를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "고소장 복호화 실패": "저장된 고소장을 읽지 못했습니다.",
+    "DOCX 파일 생성 실패": "문서 파일을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
+}
+
+
+def _failure(status_code: int, what: str, error: Exception) -> HTTPException:
+    """실패를 기록하고 사용자에게 보여 줄 오류 응답을 만든다. 기록에는 예외의 종류만 남긴다."""
+    logger.warning("%s reason=%s", what, type(error).__name__)
+    return HTTPException(status_code=status_code, detail=FAILURE_MESSAGES[what])
+
+
 def is_internal_chat_message(content: str) -> bool:
     """프론트가 첫 질문 생성을 위해 보내는 내부 메시지는 사용자 히스토리에서 제외한다."""
     return (content or "").strip() in INTERNAL_BOOTSTRAP_MESSAGES
@@ -346,10 +363,7 @@ async def init_chat_session(
         rag_keyword = ai_response.get("rag_keyword")
         rag_cases_data = ai_response.get("rag_cases", [])
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI 서비스 연결 실패: {str(e)}"
-        )
+        raise _failure(503, "AI 서비스 연결 실패", e)
 
     # 3. Complaint 업데이트 (crime_type, ai_session_id 설정)
     complaint.crime_type = offense
@@ -408,10 +422,7 @@ async def start_complaint(
         session_id = ai_response.get("session_id")
         first_question = ai_response.get("message", "사건에 대해 설명해주세요.")
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI 서비스 연결 실패: {str(e)}"
-        )
+        raise _failure(503, "AI 서비스 연결 실패", e)
 
     # 3. Complaint 업데이트 (crime_type, ai_session_id 설정)
     complaint.crime_type = request.offense
@@ -504,20 +515,11 @@ async def send_chat_message(
                     message=request.message
                 )
             except Exception as restore_error:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"세션 복원 실패: {str(restore_error)}"
-                )
+                raise _failure(503, "세션 복원 실패", restore_error)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"AI 서비스 연결 실패: {str(e)}"
-            )
+            raise _failure(503, "AI 서비스 연결 실패", e)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI 서비스 연결 실패: {str(e)}"
-        )
+        raise _failure(503, "AI 서비스 연결 실패", e)
 
     # 5. AI 응답 추출
     reply = ai_response.get("reply", "")
@@ -608,10 +610,7 @@ async def get_chat_rag(
     try:
         rag_response = await ai_service.get_chat_rag(complaint.ai_session_id)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI RAG 조회 실패: {str(e)}"
-        )
+        raise _failure(503, "AI RAG 조회 실패", e)
 
     rag_cases_data = rag_response.get("rag_cases") or []
     rag_keyword = rag_response.get("rag_keyword")
@@ -647,6 +646,10 @@ def _finish_generation(db: Session, complaint: Complaint, ai_response: dict) -> 
     verification = ai_response.get("verification")
     if not isinstance(verification, dict):
         verification = None
+
+    # 본문이 빈 응답을 완성된 고소장으로 저장하지 않는다.
+    if not criminal_facts.strip():
+        raise _failure(503, "초안 작성 실패", ValueError("empty_draft"))
 
     if verification and verification.get("status") == "awaiting_confirmation":
         return {
@@ -727,20 +730,11 @@ async def generate_complaint(
                 # 복원된 세션으로 고소장 작성 재요청
                 ai_response = await ai_service.chat_compose(effective_session_id)
             except Exception as restore_error:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"세션 복원 실패: {str(restore_error)}"
-                )
+                raise _failure(503, "세션 복원 실패", restore_error)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"AI 서비스 연결 실패: {str(e)}"
-            )
+            raise _failure(503, "AI 서비스 연결 실패", e)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI 서비스 연결 실패: {str(e)}"
-        )
+        raise _failure(503, "AI 서비스 연결 실패", e)
 
     return _finish_generation(db, complaint, ai_response)
 
@@ -810,7 +804,7 @@ def download_complaint_docx(
         criminal_facts = decrypted_data.get("criminal_facts", "")
         accusation_reason = decrypted_data.get("accusation_reason", "")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"고소장 복호화 실패: {str(e)}")
+        raise _failure(500, "고소장 복호화 실패", e)
 
     # 4. 필수 정보 확인
     if not complaint.complainant_name or not complaint.accused_name or not complaint.crime_type:
@@ -853,7 +847,7 @@ def download_complaint_docx(
             police_station_name=complaint.police_station_name or "○○경찰서"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DOCX 파일 생성 실패: {str(e)}")
+        raise _failure(500, "DOCX 파일 생성 실패", e)
 
     # 6. 다운로드 시점 기록 (TTL 삭제용)
     from datetime import datetime, timezone
