@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from cfg import settings
-from services.openai_client import respond, respond_parsed
+from services.openai_client import LLMCallError, respond, respond_parsed
 from services.pii import PROMPT_NOTE as PII_PROMPT_NOTE
 from schemas.extraction import extraction_model
 from loaders.offense_loader import get_offense_meta
@@ -376,9 +376,12 @@ def compose_complaint(meta, collected: dict, evidence: List[str]):
             "- ‘기망’, ‘착오’, ‘재산적 처분행위’, ‘재산상 손해’라는 용어는 대응하는 사실을 서술한 단계에만 쓰십시오.\n"
         )
 
+    # 호출이 실패하면 LLMCallError가 올라간다. 빈 초안을 만들어 돌려주지 않는다.
     out = respond(settings.OPENAI_COMPOSE_MODEL, COMPOSE_SYSTEM, user)
     draft = postprocess_complaint(out)
     sections = split_complaint_sections(draft)
+    if not any(v.strip() for v in sections.values()):
+        raise LLMCallError("no_sections")
     return {
         "offense": meta.offense,
         "title": meta.title_ko,

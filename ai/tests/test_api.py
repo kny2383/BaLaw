@@ -259,6 +259,33 @@ def test_confirm_question_restores_identifiers(client, fake, confirm_on):
     assert [c["quote"] for c in body["verification"]["to_confirm"]] == ["김가상에게"]
 
 
+@pytest.mark.parametrize("broken", ["call_fails", "empty_output", "no_text_at_all"])
+def test_compose_failure_is_an_error_not_an_empty_draft(client, fake, broken):
+    """작성 호출이 실패하거나 쓸 수 있는 글이 없으면 빈 초안을 200으로 돌려주지 않는다 (M10)."""
+    sid = _init(client)["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    if broken == "call_fails":
+        fake.fail_compose = True
+    else:
+        fake.compose_text = "" if broken == "empty_output" else "   \n  "
+    r = client.post("/chat/compose", json={"session_id": sid})
+    assert r.status_code == 502
+    assert "fake failure" not in r.text
+    # 실패한 뒤 다시 요청하면 작성된다.
+    fake.reset()
+    assert client.post("/chat/compose", json={"session_id": sid}).status_code == 200
+
+
+def test_rewrite_call_failure_keeps_the_draft_and_says_so(client, fake):
+    sid = _init(client)["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    fake.verify_results = [["피고소인에게"]]
+    fake.fail_rewrite = True
+    body = client.post("/chat/compose", json={"session_id": sid}).json()
+    assert body["verification"]["status"] == "rewrite_failed"
+    assert "피고소인에게" in body["sections"]["criminal_facts"]
+
+
 def test_compose_unknown_session(client):
     assert client.post("/chat/compose", json={"session_id": "none"}).status_code == 404
 

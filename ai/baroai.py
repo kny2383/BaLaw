@@ -11,7 +11,7 @@ from flow.chat_graph import build_chat_graph, claims_to_confirm
 from flow.checkpoint import chat_config, delete_session, prune_session, rag_config
 from flow.rag_graph import build_rag_graph, failed_result
 from services import pii
-from services.openai_client import StructuredOutputError
+from services.openai_client import LLMCallError, StructuredOutputError
 from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
 from langgraph.types import Command
@@ -267,7 +267,12 @@ def chat_compose(req: ComposeRequest):
     state = _session(req.session_id)
     request = {"action": "compose", "offense": _offense_from_rag(req.session_id, state)}
     # 확인을 기다리던 중에 다시 작성을 요청하면 처음부터 새로 쓴다 (기다리던 확인은 버린다).
-    out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
+    # 작성 호출이 실패하면 그래프는 아무것도 저장하지 않는다. 빈 초안을 돌려주지 않고 오류로 알린다.
+    try:
+        out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
+    except LLMCallError as e:
+        print(f"[COMPOSE] 초안 작성 실패 session={req.session_id} reason={e}")
+        raise HTTPException(502, "초안을 작성하지 못했습니다. 잠시 후 다시 시도해 주세요.")
     prune_session(req.session_id)
     return _compose_response(req.session_id, out)
 

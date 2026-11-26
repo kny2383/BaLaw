@@ -11,7 +11,8 @@ def client() -> OpenAI:
     if _client is None:
         if not settings.OPENAI_API_KEY:
             raise RuntimeError("OPENAI_API_KEY가 설정되어 있지 않습니다. .env를 확인하세요.")
-        _client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        # 연결 오류, 시간 초과, 429, 5xx는 SDK가 간격을 늘려 가며 다시 시도한다. 그래도 실패하면 예외가 올라온다.
+        _client = OpenAI(api_key=settings.OPENAI_API_KEY, max_retries=settings.OPENAI_MAX_RETRIES)
     return _client
 
 def _extract_output_text(resp) -> str:
@@ -39,7 +40,15 @@ def _extract_output_text(resp) -> str:
 
     return ""
 
+class LLMCallError(RuntimeError):
+    """LLM에서 쓸 수 있는 결과를 받지 못했다 (다시 시도한 뒤에도 실패한 호출, 빈 출력)."""
+
+
 def respond(model: str, system: str, user: str, reasoning_effort: Optional[str] = None) -> str:
+    """글로 된 출력을 받는다. 실패하거나 출력이 비면 LLMCallError를 던진다.
+
+    예전에는 실패를 빈 문자열로 돌려줬고, 그 빈 문자열이 빈 초안으로 저장됐다 (지표 M10).
+    """
     c = client()
     # 추론 강도를 지정하지 않으면 요청에 넣지 않는다 (모델 기본값).
     options = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
@@ -53,13 +62,18 @@ def respond(model: str, system: str, user: str, reasoning_effort: Optional[str] 
             ],
             **options,
         )
-        return _extract_output_text(resp).strip()
     except Exception as e:
-        print(f"Error during OpenAI API call: {e}")
-        return ""
+        # 예외 본문에는 요청 내용(사용자 서술)이 들어갈 수 있어 종류만 남긴다.
+        print(f"[LLM] 호출 실패: {type(e).__name__}")
+        raise LLMCallError(type(e).__name__) from e
+    text = (_extract_output_text(resp) or "").strip()
+    if not text:
+        print("[LLM] 빈 출력")
+        raise LLMCallError("empty_output")
+    return text
 
 
-class StructuredOutputError(RuntimeError):
+class StructuredOutputError(LLMCallError):
     """구조화 출력을 받지 못했다 (호출 오류, 모델의 거부, 잘리거나 스키마에 맞지 않는 출력)."""
 
 
