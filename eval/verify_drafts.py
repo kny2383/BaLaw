@@ -101,8 +101,10 @@ def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify, rou
         r["draft"] = "\n\n".join(f"[{k}]\n{v}" for k, v in sections.items() if isinstance(v, str) and v.strip())
         r["compose"]["body"] = {**body, "sections": sections, "verification": state["review"]}
         r["verify_rewrite_s"] = round(time.time() - t0, 1)
-        (out_dir / f.name).write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
         rv = state["review"]
+        # 검증하지 못했거나 다시 쓰지 못한 사례는 저장하지 않는다. 같은 실행 이름으로 다시 돌리면 재시도된다.
+        if rv["status"] not in ("unverified", "rewrite_failed"):
+            (out_dir / f.name).write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"{r['id']}: {rv['status']} 찾음 {len(rv['removed']) + len(rv['unsupported'])} "
               f"({r['verify_rewrite_s']}초)", flush=True)
         if rv["status"] in ("unverified", "rewrite_failed"):
