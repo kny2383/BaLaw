@@ -63,6 +63,27 @@ jobs:
       - run: ruff check .
       - run: pytest -q
 
+  ai-test:
+    name: AI 테스트
+    needs: changes
+    if: needs.changes.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            ai/requirements.lock
+            ai/requirements-dev.txt
+      - run: pip install -r requirements.lock -r requirements-dev.txt
+      # 외부 호출은 모두 대역이다. OpenAI 키가 없어도 돌고 비용이 들지 않는다.
+      - run: pytest -q
+
   eval-cases:
     name: 평가 사례 형식·정답 잠금 검사
     needs: changes
