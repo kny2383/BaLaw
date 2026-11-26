@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import not_
@@ -140,13 +141,42 @@ def get_restore_history(db: Session, complaint_id: int, exclude_message_id: Opti
     ]
 
 
+# 이름 칸에 값 대신 적는 말. 이런 값을 넘기면 서술의 같은 낱말이 모두 표식으로 바뀐다.
+_NOT_A_NAME = ("모름", "모르", "불상", "미상", "성명불상", "성명미상", "알수없", "없음")
+
+
+def _is_placeholder(value: str) -> bool:
+    """'성명 불상', '모름.', '성명불상(추정)'처럼 띄어쓰기나 기호가 달라도 걸러낸다."""
+    key = re.sub(r"[\s().,·]", "", value)
+    return key.startswith(_NOT_A_NAME)
+
+
+def known_pii_of(complaint: Complaint) -> dict:
+    """입력 화면에서 받은 이름·주소·전화번호. AI 서비스가 서술에서 이 값을 찾아 표식으로 바꾼 뒤 LLM에 보낸다 (S05)."""
+    def values(*fields) -> list[str]:
+        out = []
+        for field in fields:
+            value = (encryption_service.decrypt_field(field) or "").strip() if field else ""
+            if len(value) >= 2 and not _is_placeholder(value) and value not in out:
+                out.append(value)
+        return out
+
+    return {
+        "names": values(complaint.complainant_name, complaint.accused_name),
+        "addresses": values(complaint.complainant_address, complaint.complainant_office_address,
+                            complaint.accused_address, complaint.accused_office_address),
+        "phones": values(complaint.complainant_phone, complaint.complainant_home_phone,
+                         complaint.complainant_office_phone, complaint.accused_phone),
+    }
+
+
 async def restore_ai_session(db: Session, complaint: Complaint, exclude_message_id: Optional[int] = None) -> str:
     history_list = get_restore_history(
         db=db,
         complaint_id=complaint.id,
         exclude_message_id=exclude_message_id
     )
-    new_session_id = await ai_service.chat_restore_session(history_list)
+    new_session_id = await ai_service.chat_restore_session(history_list, known_pii=known_pii_of(complaint))
     complaint.ai_session_id = new_session_id
     db.flush()
     return new_session_id
@@ -302,7 +332,8 @@ async def init_chat_session(
     try:
         ai_response = await ai_service.chat_init(
             text=request.text,
-            offense=request.offense
+            offense=request.offense,
+            known_pii=known_pii_of(complaint)
         )
         session_id = ai_response.get("session_id")
         offense = ai_response.get("offense")
