@@ -380,3 +380,9 @@ def test_unasked_phrase_in_the_same_sentence_is_not_recorded_as_said(fake, monke
     out = graph.invoke(Command(resume=[True]), CONFIG)
     said = next(m["content"] for m in reversed(out["history"]) if m["role"] == "user")
     assert said.endswith(f"사실이 맞습니다: {BAD}") and SENTENCE not in said
+
+
+def test_sentence_is_recorded_once_when_several_phrases_are_confirmed(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER]])
+    out = graph.invoke(Command(resume=[True, True]), CONFIG)
+    assert out["history"][-1]["content"].count(SENTENCE) == 1

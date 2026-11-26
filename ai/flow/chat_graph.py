@@ -204,8 +204,8 @@ def confirm(state: ChatState) -> dict:
         # 구절만으로는 뜻이 정해지지 않으므로 구절이 든 문장을 적는다. 다만 같은 문장에 사실이 아니라고 했거나
         # 묻지 않은 구절이 있으면 구절만 적는다. 문장을 적으면 확인받지 않은 내용까지 사용자의 말이 된다.
         unconfirmed = {c.get("sentence") for c in denied}
-        said = CONFIRM_PREFIX + " / ".join(
-            c["quote"] if c.get("sentence") in unconfirmed else (c.get("sentence") or c["quote"]) for c in kept)
+        texts = [c["quote"] if c.get("sentence") in unconfirmed else (c.get("sentence") or c["quote"]) for c in kept]
+        said = CONFIRM_PREFIX + " / ".join(dict.fromkeys(texts))  # 같은 문장의 구절이 여럿이면 문장은 한 번만
         update["history"] = state["history"] + [{"role": "user", "content": said}]
     return update
 
