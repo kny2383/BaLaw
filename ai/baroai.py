@@ -72,8 +72,12 @@ def health():
     return {"ok": True, "service": app.title, "model": settings.OPENAI_CHAT_MODEL}
 
 
+UNSUPPORTED = "unsupported"
+
+
 def _normalize_offense(offense: Optional[str]) -> Optional[str]:
-    if not offense:
+    # 값이 없거나 공백뿐이면 죄목을 고르지 않은 것이다 (판례 검색 결과로 양식을 정한다).
+    if not offense or not offense.strip():
         return None
 
     normalized = offense.strip().lower()
@@ -88,7 +92,8 @@ def _normalize_offense(offense: Optional[str]) -> Optional[str]:
         "모욕죄": "insult",
     }
 
-    return offense_map.get(normalized, "fraud")
+    # 지원하지 않는 죄목을 사기 양식으로 바꾸지 않는다 (결정 0001 결정 2, 지표 M5).
+    return offense_map.get(normalized, UNSUPPORTED)
 
 
 def _session(session_id: str) -> dict:
@@ -189,6 +194,10 @@ def _send_to_session(session_id: str, message: str) -> dict:
 
 @app.post("/chat/init")
 def chat_init(req: ChatInitRequest, background_tasks: BackgroundTasks):
+    if _normalize_offense(req.offense) == UNSUPPORTED:
+        # 세션을 만들지 않고 LLM도 부르지 않는다. 다른 죄목의 양식으로 질문하고 초안을 쓰지 않기 위해서다.
+        return {"session_id": None, "offense": UNSUPPORTED, "rag_status": "skipped", "rag_keyword": None, "rag_cases": []}
+
     sid = str(uuid4())
     state = _create_session(sid, req.text, req.offense, req.known_pii)
     # 판례 검색에도 표식으로 바꾼 서술을 쓴다.
