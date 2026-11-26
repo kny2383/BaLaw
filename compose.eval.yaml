@@ -33,8 +33,9 @@ services:
       # 정보 추출 호출의 추론 강도를 바꿔 비교할 때 지정한다. 비우면 서비스 기본값(low).
       #   EVAL_EXTRACT_REASONING_EFFORT=low docker compose -f compose.yaml -f compose.eval.yaml up -d --build ai
       OPENAI_EXTRACT_REASONING_EFFORT: ${EVAL_EXTRACT_REASONING_EFFORT:-}
-      # 1이면 검증이 찾은 표현을 고치기 전에 사용자 확인을 기다린다. 평가기의 모의 사용자가 답한다.
-      #   EVAL_DRAFT_CONFIRM=1 docker compose -f compose.yaml -f compose.eval.yaml up -d --build ai
+      # 비우면 서비스 기본값(켜짐): 검증이 찾은 표현을 고치기 전에 사용자 확인을 기다리고, 평가기의 모의 사용자가 답한다.
+      # 묻지 않고 고치는 동작과 비교하거나 verify_drafts.py를 쓸 때는 0으로 둔다.
+      #   EVAL_DRAFT_CONFIRM=0 docker compose -f compose.yaml -f compose.eval.yaml up -d --build ai
       DRAFT_CONFIRM: ${EVAL_DRAFT_CONFIRM:-}
     depends_on:
       llm-proxy:

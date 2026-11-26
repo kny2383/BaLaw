@@ -53,8 +53,9 @@ class Settings:
     OPENAI_EXTRACT_REASONING_EFFORT: str = _reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
     # 초안을 대화와 대조해 근거 없는 표현을 고쳐 다시 쓰는 횟수의 상한. 0이면 검증하지 않는다.
     DRAFT_MAX_REWRITES: int = int(os.getenv("DRAFT_MAX_REWRITES", "").strip() or "1")
-    # 검증이 찾은 표현을 고치기 전에 사용자에게 사실인지 묻는다. 꺼 두면(기본) 묻지 않고 고친다.
-    DRAFT_CONFIRM: bool = os.getenv("DRAFT_CONFIRM", "").strip() == "1"
+    # 검증이 찾은 표현을 고치기 전에 사용자에게 사실인지 묻는다 (기본 켜짐). 0이면 묻지 않고 고친다.
+    # 켜 두려면 호출하는 쪽이 awaiting_confirmation 응답을 다뤄야 한다 (서버의 /generate/confirm, 화면의 확인 창).
+    DRAFT_CONFIRM: bool = os.getenv("DRAFT_CONFIRM", "").strip() != "0"
     # 한 번에 묻는 표현 개수의 상한. 넘는 것은 묻지 않고 고친다.
     DRAFT_CONFIRM_MAX: int = _at_least_one("DRAFT_CONFIRM_MAX", 5)
     # 사용자 서술의 식별정보를 표식으로 바꿔 LLM에 보낸다 (S05). 0이면 끈다 (전후 비교용).
