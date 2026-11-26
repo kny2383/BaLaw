@@ -3,6 +3,10 @@
 서버와 평가기가 기대는 형식만 검사한다. 대화 흐름을 어떻게 구현하는지는 보지 않으므로,
 구조를 바꾼 뒤에도 이 테스트가 그대로 통과해야 한다.
 """
+import pytest
+
+import baroai
+
 NARRATIVE = "중고거래 앱에서 아이폰을 30만원에 판다는 글을 보고 송금했는데 물건이 오지 않았습니다."
 KICKOFF = "위 사건 개요를 기반으로, 이어서 질문을 해 주세요."
 
@@ -175,7 +179,7 @@ def test_compose_returns_sections(client):
     assert set(sections) == {"criminal_facts", "accusation_reason"}
     assert all(isinstance(v, str) and v.strip() for v in sections.values())
     assert body["verification"] == {"status": "passed", "rewrites": 0, "rechecked": False,
-                                    "unsupported": [], "removed": []}
+                                    "unsupported": [], "removed": [], "confirmed": []}
 
 
 def test_compose_reports_what_was_rewritten(client, fake):
@@ -186,6 +190,73 @@ def test_compose_reports_what_was_rewritten(client, fake):
     assert body["verification"]["status"] == "rewritten"
     assert [c["quote"] for c in body["verification"]["removed"]] == ["피고소인에게"]
     assert "피고소인에게" not in body["sections"]["criminal_facts"]
+
+
+@pytest.fixture
+def confirm_on(monkeypatch):
+    monkeypatch.setattr(baroai.settings, "DRAFT_CONFIRM", True)
+
+
+def _compose_waiting(client, fake, quotes):
+    sid = _init(client)["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    fake.verify_results = [quotes]
+    return sid, client.post("/chat/compose", json={"session_id": sid}).json()
+
+
+def test_compose_asks_the_user_before_rewriting(client, fake, confirm_on):
+    sid, body = _compose_waiting(client, fake, ["피고소인에게"])
+    v = body["verification"]
+    assert v["status"] == "awaiting_confirmation"
+    assert [c["quote"] for c in v["to_confirm"]] == ["피고소인에게"]
+    assert "피고소인에게" in body["sections"]["criminal_facts"]  # 아직 고치지 않은 초안
+
+    r = client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [False]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["verification"]["status"] == "rewritten" and "to_confirm" not in body["verification"]
+    assert "피고소인에게" not in body["sections"]["criminal_facts"]
+
+
+def test_confirm_keeps_what_the_user_confirms(client, fake, confirm_on):
+    sid, _ = _compose_waiting(client, fake, ["피고소인에게"])
+    body = client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [True]}).json()
+    assert body["verification"]["status"] == "confirmed"
+    assert "피고소인에게" in body["sections"]["criminal_facts"]
+
+
+def test_confirm_rejects_wrong_number_of_answers(client, fake, confirm_on):
+    sid, _ = _compose_waiting(client, fake, ["피고소인에게"])
+    assert client.post("/chat/compose/confirm", json={"session_id": sid, "answers": []}).status_code == 400
+    # 거절된 뒤에도 같은 질문에 답할 수 있다.
+    assert client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [False]}).status_code == 200
+
+
+def test_confirm_without_a_waiting_draft(client, fake, confirm_on):
+    sid = _init(client)["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    assert client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [True]}).status_code == 409
+    client.post("/chat/compose", json={"session_id": sid})  # 근거 없는 표현이 없어 멈추지 않는다
+    assert client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [True]}).status_code == 409
+    assert client.post("/chat/compose/confirm", json={"session_id": "none", "answers": [True]}).status_code == 404
+
+
+def test_confirm_cannot_be_answered_twice(client, fake, confirm_on):
+    sid, _ = _compose_waiting(client, fake, ["피고소인에게"])
+    client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [False]})
+    assert client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [False]}).status_code == 409
+
+
+def test_confirm_question_restores_identifiers(client, fake, confirm_on):
+    """확인을 묻는 표현은 표식이 아니라 사용자가 쓴 원래 값으로 보인다."""
+    r = client.post("/chat/init", json={"text": "김가상에게 돈을 보냈습니다", "offense": "fraud",
+                                        "known_pii": {"names": ["김가상"]}})
+    sid = r.json()["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    fake.compose_text = "=== 범죄사실 ===\n○ 고소인은 [이름1]에게 금원을 송금하였습니다.\n\n=== 고소이유 ===\n○ 수사를 요청합니다.\n"
+    fake.verify_results = [["[이름1]에게"]]
+    body = client.post("/chat/compose", json={"session_id": sid}).json()
+    assert [c["quote"] for c in body["verification"]["to_confirm"]] == ["김가상에게"]
 
 
 def test_compose_unknown_session(client):

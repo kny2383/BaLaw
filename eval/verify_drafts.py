@@ -56,6 +56,8 @@ def main() -> int:
 
     if settings.DRAFT_MAX_REWRITES < 1:
         raise SystemExit("DRAFT_MAX_REWRITES가 0이라 검증하지 않는다. 1 이상으로 두고 실행한다.")
+    if settings.DRAFT_CONFIRM:
+        raise SystemExit("DRAFT_CONFIRM이 켜져 있다. 이 도구는 사용자 확인에 답하지 못하므로 끄고 실행한다.")
     print(f"재작성 상한 {settings.DRAFT_MAX_REWRITES}", flush=True)
 
     src_dir = ROOT / "runs" / args.src / "cases"
@@ -86,7 +88,7 @@ def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify, rou
             continue
         proxy_control({"case_id": r["id"]})
         state = {"history": history_of(r), "draft": {k: body[k] for k in ("offense", "title", "sections")},
-                 "review": {"status": "pending", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}}
+                 "review": {"status": "pending", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": [], "confirmed": []}}
         t0 = time.time()
         state.update(verify(state))
         # 서비스 그래프와 같은 분기를 따른다 (반복 상한은 DRAFT_MAX_REWRITES).
