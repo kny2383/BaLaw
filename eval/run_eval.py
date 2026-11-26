@@ -253,8 +253,10 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
 
     if init.get("offense") == "unsupported":
         # 서비스가 미지원 죄목으로 답했다. 세션도 판례 검색도 없다.
-        out["rag"] = {"status": "skipped", "keyword": None, "cases": []}
-        if case.get("run_conversation"):
+        # 미지원 사례가 맞으면 판례 검색 지표에서 뺀다. 지원 죄목 사례인데 미지원으로 답했다면 실패로 센다.
+        wrong = case["expected_offense"] != "unsupported"
+        out["rag"] = {"status": "failed" if wrong else "skipped", "keyword": None, "cases": []}
+        if wrong:
             out["errors"].append("지원 죄목 사례인데 서비스가 미지원으로 답했다")
         out["wall_s"] = round(time.time() - t0, 3)
         return out

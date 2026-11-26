@@ -55,6 +55,7 @@ def test_init_offense_names(client):
     assert _init(client, offense="사이버사기")["offense"] == "fraud"
     assert _init(client, offense="모욕")["offense"] == "insult"
     assert _init(client, offense=None)["offense"] in ("fraud", "insult")
+    assert _init(client, offense="  ")["offense"] in ("fraud", "insult")  # 공백뿐이면 고르지 않은 것
 
 
 @pytest.mark.parametrize("offense", ["횡령", "폭행", "명예훼손", "embezzlement", "아무 말"])

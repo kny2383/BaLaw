@@ -76,7 +76,8 @@ UNSUPPORTED = "unsupported"
 
 
 def _normalize_offense(offense: Optional[str]) -> Optional[str]:
-    if not offense:
+    # 값이 없거나 공백뿐이면 죄목을 고르지 않은 것이다 (판례 검색 결과로 양식을 정한다).
+    if not offense or not offense.strip():
         return None
 
     normalized = offense.strip().lower()
