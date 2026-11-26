@@ -365,11 +365,11 @@ async def init_chat_session(
         raise _failure(503, "AI 서비스 연결 실패", e)
 
     # 지원하지 않는 죄목이면 AI 서비스는 세션을 만들지 않는다. 고소장에 아무것도 남기지 않고 안내한다.
-    if offense == "unsupported" or not session_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=UNSUPPORTED_OFFENSE_MESSAGE if offense == "unsupported" else FAILURE_MESSAGES["AI 서비스 연결 실패"],
-        )
+    if offense == "unsupported":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=UNSUPPORTED_OFFENSE_MESSAGE)
+    # 세션 ID가 없는 응답은 AI 서비스 쪽의 문제다. 기록하고 실패로 알린다.
+    if not session_id:
+        raise _failure(503, "AI 서비스 연결 실패", ValueError("no_session_id"))
 
     # 3. Complaint 업데이트 (crime_type, ai_session_id 설정)
     complaint.crime_type = offense

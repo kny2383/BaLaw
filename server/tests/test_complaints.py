@@ -304,6 +304,14 @@ def test_unsupported_offense_starts_nothing(client, db_session, user_tokens, mon
     assert saved.ai_session_id is None and saved.crime_type is None
     assert db_session.execute(text("SELECT count(*) FROM chat_messages")).scalar() == 0
 
+    # 죄목은 지원하는데 세션 ID가 없는 응답은 AI 서비스의 문제이므로 실패(503)로 알린다.
+    async def broken_init(text, offense=None, known_pii=None):
+        return {"session_id": None, "offense": "fraud"}
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", broken_init)
+    r = client.post(f"/api/complaints/{cid}/chat/init", json={"text": "서술", "offense": "사기"}, headers=auth_header(user_tokens))
+    assert r.status_code == 503 and _complaint(db_session, cid).ai_session_id is None
+
 
 # ---------- 고소장 생성: 사용자 확인 ----------
 WAITING = {"status": "awaiting_confirmation", "rewrites": 0, "rechecked": False, "removed": [], "confirmed": [],
