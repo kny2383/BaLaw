@@ -58,6 +58,15 @@ def test_keyword_candidates_that_matter_still_find_cases():
     assert not rag.is_crime("사기", "컴퓨터등사용사기"), "더 좁은 죄명을 찾을 때 넓은 죄명의 판례는 고르지 않는다"
 
 
+def test_middle_dot_label_with_other_crimes_is_not_pure(monkeypatch):
+    """가운뎃점으로 여러 죄명을 이은 라벨은 쉼표가 없어도 한 죄목만 다룬 판례가 아니다."""
+    joined = "특정금융거래정보의보고및이용등에관한법률위반·외국환거래법위반·사기·배상명령신청"
+    assert rag.is_crime(joined, "사기") and not rag.is_only_crime(joined, "사기")
+    assert rag.is_only_crime("사기·상습사기", "사기") and rag.is_only_crime("사기{인정된죄명:특경법위반}", "사기")
+    assert rag.is_only_crime("아동·청소년의성보호에관한법률위반", "아동·청소년의성보호에관한법률위반")
+    assert _search(monkeypatch, [joined, "사기"], k=2) == ["사기", joined]
+
+
 def test_summary_keeps_the_retrieved_case_number_and_label():
     """LLM이 다른 사건번호나 죄명을 돌려줘도 검색 결과의 값을 쓴다."""
     case = {"case_no": "2020도1", "label": "사기", "summary": "", "facts": "사실"}
