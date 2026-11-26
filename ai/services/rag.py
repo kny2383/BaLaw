@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
-from openai import OpenAI
 from cfg import settings
+from services import llm
 from services.cache import cache_get, cache_set_json
 
 BASE = Path(__file__).resolve().parents[1]
@@ -16,12 +16,10 @@ DB_PATH = BASE / "data" / "rag_db"
 CSV_PATH = BASE / "data" / "crime_mapping_worklist.csv"
 
 COLLECTION_NAME = "criminal_cases"
-LLM_MODEL = settings.OPENAI_COMPOSE_MODEL
 
 # Lazy initialization
 _chroma_client = None
 _collection = None
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def _case_summary_cache_key(case_no: str) -> str:
@@ -89,11 +87,8 @@ def predict_crime_keyword(user_query: str) -> str:
     {user_query}
     """
 
-    resp = openai_client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return (resp.choices[0].message.content or "").strip()
+    # 호출이 실패하거나 출력이 비면 예외가 올라가고, 판례 검색 그래프가 실패 상태로 남긴다.
+    return llm.text("rag_keyword", prompt)
 
 
 # 벡터 검색 + 죄명 필터
@@ -257,18 +252,11 @@ def summarize_single_case(case: dict) -> dict:
     """
 
     try:
-        resp = openai_client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",  "content": user_prompt},
-            ],
-        )
-        raw = resp.choices[0].message.content or ""
-        data = json.loads(raw)
+        data = json.loads(llm.text("rag_summary", user_prompt, system=system_prompt))
         return _normalize_case_summary(case, data)
     except Exception as e:
-        print(f"[RAG CACHE] summarize failed case_no={case.get('case_no', '')}: {e}")
+        # 요약을 만들지 못하면 판례 원문의 앞부분을 보여 준다. 예외 본문은 기록하지 않는다.
+        print(f"[RAG CACHE] summarize failed case_no={case.get('case_no', '')}: {type(e).__name__}")
         return _fallback_case_summary(case)
 
 

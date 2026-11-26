@@ -26,7 +26,7 @@ from cfg import settings
 from flow.checkpoint import get_checkpointer
 from flow.state import ChatState
 from loaders.offense_loader import get_offense_meta
-from services.openai_client import StructuredOutputError
+from services.llm import StructuredOutputError
 from services.pipelines import (
     _user_window,
     classify_need_caution,

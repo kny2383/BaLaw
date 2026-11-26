@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from cfg import settings
-from services.openai_client import LLMCallError, respond, respond_parsed
+from services import llm
+from services.llm import LLMCallError
 from services.pii import PROMPT_NOTE as PII_PROMPT_NOTE
 from schemas.extraction import extraction_model
 from loaders.offense_loader import get_offense_meta
@@ -131,8 +132,7 @@ def extract_all(user_text: str, offense: str) -> Dict[str, Dict[str, dict]]:
     prompt = _build_single_prompt(user_text, meta, offense)
     # 출력은 죄목별 스키마로 강제한다. 모든 항목과 슬롯이 빠짐없이 온다.
     # 실패하면 StructuredOutputError가 올라간다. 빈 결과로 바꿔 진행하지 않는다 (지표 M10).
-    out = respond_parsed(settings.OPENAI_CHAT_MODEL, NEUTRAL_SYSTEM, prompt, extraction_model(offense),
-                         reasoning_effort=settings.OPENAI_EXTRACT_REASONING_EFFORT)
+    out = llm.parsed("extract", NEUTRAL_SYSTEM, prompt, extraction_model(offense))
     return out.model_dump()
 
 # ---------- Enforcement (보수적 강제 규칙) ----------
@@ -393,7 +393,7 @@ def compose_complaint(meta, collected: dict, evidence: List[str]):
         )
 
     # 호출이 실패하면 LLMCallError가 올라간다. 빈 초안을 만들어 돌려주지 않는다.
-    out = respond(settings.OPENAI_COMPOSE_MODEL, COMPOSE_SYSTEM, user)
+    out = llm.text("compose", user, system=COMPOSE_SYSTEM)
     draft = postprocess_complaint(out)
     sections = split_complaint_sections(draft)
     # 범죄사실이 없는 초안은 쓸 수 없다. 구분 제목이 없는 출력은 위에서 전체가 범죄사실로 들어간다.

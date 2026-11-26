@@ -44,15 +44,38 @@ def _at_least_one(name: str, default: int) -> int:
     return value
 
 
+LLM_TASKS = ("extract", "compose", "verify", "rewrite", "rag_keyword", "rag_summary")
+
+
+def _per_task(prefix: str, defaults: dict) -> dict:
+    """작업별 설정을 읽는다. `<prefix>_<작업>` 환경 변수가 있으면 그 값, 없으면 기본값. 값이 없는 작업은 뺀다."""
+    out = {}
+    for task in LLM_TASKS:
+        value = os.getenv(f"{prefix}_{task.upper()}", "").strip() or defaults.get(task)
+        if value:
+            out[task] = value
+    return out
+
+
 class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_COMPOSE_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
     OPENAI_CHAT_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+    # 작업별 모델. LLM_MODEL_<작업>으로 바꾼다 (예: LLM_MODEL_EXTRACT). 기본값은 위의 두 모델로, 이전과 같다.
+    LLM_MODELS: dict = _per_task("LLM_MODEL", {
+        "extract": OPENAI_CHAT_MODEL, "verify": OPENAI_CHAT_MODEL,
+        "compose": OPENAI_COMPOSE_MODEL, "rewrite": OPENAI_COMPOSE_MODEL,
+        "rag_keyword": OPENAI_COMPOSE_MODEL, "rag_summary": OPENAI_COMPOSE_MODEL,
+    })
+    # 작업별 주소. OpenAI 호환 API를 내는 다른 서버로 보낼 때만 LLM_BASE_URL_<작업>으로 지정한다.
+    LLM_BASE_URLS: dict = _per_task("LLM_BASE_URL", {})
     # LLM 호출이 일시적 오류(연결, 시간 초과, 429, 5xx)로 실패했을 때 다시 시도하는 횟수.
     OPENAI_MAX_RETRIES: int = int(os.getenv("OPENAI_MAX_RETRIES", "").strip() or "2")
     # 정보 추출 호출의 추론 강도. 기본값 low의 근거는 eval/results/extract-low-dev10.md.
     # 지정하지 않던 이전 동작(모델 기본값)과 비교하려면 medium으로 둔다.
     OPENAI_EXTRACT_REASONING_EFFORT: str = _reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
+    # 작업별 추론 강도. 지정하지 않은 작업은 요청에 넣지 않는다 (모델 기본값).
+    LLM_REASONING_EFFORTS: dict = {"extract": OPENAI_EXTRACT_REASONING_EFFORT}
     # 초안을 대화와 대조해 근거 없는 표현을 고쳐 다시 쓰는 횟수의 상한. 0이면 검증하지 않는다.
     DRAFT_MAX_REWRITES: int = int(os.getenv("DRAFT_MAX_REWRITES", "").strip() or "1")
     # 검증이 찾은 표현을 고치기 전에 사용자에게 사실인지 묻는다 (기본 켜짐). 0이면 묻지 않고 고친다.

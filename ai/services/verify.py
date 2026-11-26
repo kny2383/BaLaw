@@ -5,9 +5,9 @@
 """
 from __future__ import annotations
 
-from cfg import settings
 from schemas.verification import Verification
-from services.openai_client import LLMCallError, respond, respond_parsed
+from services import llm
+from services.llm import LLMCallError
 from services.pipelines import PII_NOTE, postprocess_complaint, split_complaint_sections
 
 SECTION_TITLES = {"criminal_facts": "범죄사실", "accusation_reason": "고소이유"}
@@ -78,7 +78,7 @@ def sentence_of(quote: str, draft_text: str) -> str:
 def verify_draft(history: list[dict], sections: dict) -> list[dict]:
     """초안에서 대화에 근거가 없는 표현을 찾는다 (LLM 호출). 실패하면 StructuredOutputError."""
     user = f"{VERIFY_RULES}\n[대화]\n{format_dialogue(history)}\n\n[초안]\n{format_draft(sections)}\n"
-    out = respond_parsed(settings.OPENAI_CHAT_MODEL, VERIFY_SYSTEM, user, Verification)
+    out = llm.parsed("verify", VERIFY_SYSTEM, user, Verification)
     draft_text = format_draft(sections)
     # 초안에 없는 인용은 고칠 대상을 가리키지 못하므로 버린다.
     found = []
@@ -105,7 +105,7 @@ def rewrite_draft(sections: dict, unsupported: list[dict]) -> dict | None:
     listed = "\n".join(_listed(c) for c in unsupported)
     user = f"{REWRITE_RULES}\n[근거 없는 표현]\n{listed}\n\n[초안]\n{format_draft(sections)}\n"
     try:
-        out = respond(settings.OPENAI_COMPOSE_MODEL, REWRITE_SYSTEM, user)
+        out = llm.text("rewrite", user, system=REWRITE_SYSTEM)
     except LLMCallError:
         return None  # 호출하는 쪽이 '다시 쓰지 못함'으로 남긴다. 초안은 그대로다.
     new = split_complaint_sections(postprocess_complaint(out))
