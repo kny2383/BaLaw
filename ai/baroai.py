@@ -220,7 +220,9 @@ def chat_compose(req: ComposeRequest):
     request = {"action": "compose", "offense": _offense_from_rag(req.session_id, state)}
     out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
     prune_session(req.session_id)
-    return out["draft"]
+    # verification.status: passed(근거 없는 표현 없음) | rewritten(고쳐 씀) | flagged(남아 있음)
+    #                      | unverified(검증 호출 실패) | rewrite_failed | off
+    return {**out["draft"], "verification": out["review"]}
 
 
 @app.delete("/chat/{session_id}", status_code=204)

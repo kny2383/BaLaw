@@ -174,6 +174,17 @@ def test_compose_returns_sections(client):
     sections = body["sections"]
     assert set(sections) == {"criminal_facts", "accusation_reason"}
     assert all(isinstance(v, str) and v.strip() for v in sections.values())
+    assert body["verification"] == {"status": "passed", "rewrites": 0, "unsupported": [], "removed": []}
+
+
+def test_compose_reports_what_was_rewritten(client, fake):
+    sid = _init(client)["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    fake.verify_results = [["피고소인에게"]]
+    body = client.post("/chat/compose", json={"session_id": sid}).json()
+    assert body["verification"]["status"] == "rewritten"
+    assert [c["quote"] for c in body["verification"]["removed"]] == ["피고소인에게"]
+    assert "피고소인에게" not in body["sections"]["criminal_facts"]
 
 
 def test_compose_unknown_session(client):

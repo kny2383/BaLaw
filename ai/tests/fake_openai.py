@@ -17,6 +17,13 @@ COMPOSE_TEXT = (
     "○ 위 사실에 관하여 수사를 요청합니다.\n"
 )
 
+REWRITE_TEXT = (
+    "=== 범죄사실 ===\n"
+    "○ 고소인은 금원을 송금하였습니다.\n\n"
+    "=== 고소이유 ===\n"
+    "○ 위 사실에 관하여 수사를 요청합니다.\n"
+)
+
 
 class FakeOpenAI:
     """응답을 바꿔 가며 쓰는 가짜 서버. 받은 요청은 requests에 쌓인다."""
@@ -40,6 +47,9 @@ class FakeOpenAI:
         self.fail_extract = False     # True면 추출 요청에 400을 돌려준다
         self.keyword = "사기"
         self.fail_keyword = False     # True면 죄명 키워드 요청에 400을 돌려준다
+        self.verify_results: list[list[str]] = []  # 검증 호출마다 차례로 돌려줄 "근거 없는 표현" 목록. 비면 없음
+        self.fail_verify = False      # True면 초안 검증 요청에 400을 돌려준다
+        self.rewrite_text = REWRITE_TEXT
 
     def close(self) -> None:
         self._server.shutdown()
@@ -58,14 +68,22 @@ class FakeOpenAI:
 
     def _chat(self, body: dict) -> tuple[int, dict]:
         rf = body.get("response_format") or {}
-        if rf.get("type") == "json_schema":
+        if rf.get("type") == "json_schema" and "unsupported" in rf["json_schema"]["schema"].get("properties", {}):
+            if self.fail_verify:
+                return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
+            quotes = self.verify_results.pop(0) if self.verify_results else []
+            content = json.dumps({"unsupported": [{"quote": q, "reason": "대화에 없는 내용"} for q in quotes]},
+                                 ensure_ascii=False)
+        elif rf.get("type") == "json_schema":
             if self.fail_extract:
                 return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
             schema = rf["json_schema"]["schema"]
             content = json.dumps(self._fill(schema, schema.get("$defs", {})), ensure_ascii=False)
         else:
             text = "\n".join(str(m.get("content", "")) for m in body.get("messages", []))
-            if "drafting assistant" in text:
+            if "revise a draft" in text:
+                content = self.rewrite_text
+            elif "drafting assistant" in text:
                 content = COMPOSE_TEXT
             elif "죄목 리스트" in text:
                 if self.fail_keyword:

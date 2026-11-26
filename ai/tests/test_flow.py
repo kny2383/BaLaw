@@ -119,3 +119,104 @@ def test_only_fixed_codes_are_plain_state_fields():
                 continue
             container = typing.get_origin(annotation) or annotation
             assert container in (dict, list), f"{schema.__name__}.{name}: {annotation}는 암호화되지 않는다"
+
+
+# ---------- 작성 → 검증 → 재작성 ----------
+BAD = "피고소인에게"  # 가짜 초안(COMPOSE_TEXT)에 들어 있는 표현
+
+
+def _compose(fake, monkeypatch, max_rewrites=1):
+    from cfg import settings
+    monkeypatch.setattr(settings, "DRAFT_MAX_REWRITES", max_rewrites)
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    graph.invoke({"request": {"action": "message", "message": "네"}}, CONFIG)
+    fake.requests.clear()
+    return graph.invoke({"request": {"action": "compose"}}, CONFIG)
+
+
+def _kinds(fake) -> list[str]:
+    """작성 요청 동안 나간 LLM 호출의 종류를 순서대로."""
+    kinds = []
+    for r in fake.requests:
+        body = r["body"]
+        if body.get("response_format"):
+            kinds.append("verify")
+        elif "revise a draft" in body["messages"][0]["content"]:
+            kinds.append("rewrite")
+        else:
+            kinds.append("compose")
+    return kinds
+
+
+def test_graph_has_verify_and_rewrite_nodes():
+    assert {"verify", "rewrite"} <= set(build_chat_graph(InMemorySaver()).get_graph().nodes)
+
+
+def test_clean_draft_is_not_rewritten(fake, monkeypatch):
+    out = _compose(fake, monkeypatch)
+    assert _kinds(fake) == ["compose", "verify"]
+    assert out["review"] == {"status": "passed", "rewrites": 0, "unsupported": [], "removed": []}
+    assert BAD in out["draft"]["sections"]["criminal_facts"]
+
+
+def test_unsupported_claim_is_rewritten_once(fake, monkeypatch):
+    fake.verify_results = [[BAD]]
+    out = _compose(fake, monkeypatch)
+    assert _kinds(fake) == ["compose", "verify", "rewrite"]
+    assert out["review"]["status"] == "rewritten" and out["review"]["rewrites"] == 1
+    assert [c["quote"] for c in out["review"]["removed"]] == [BAD]
+    assert BAD not in out["draft"]["sections"]["criminal_facts"]
+    # 재작성 요청에는 지적된 표현과 초안이 들어간다.
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f'"{BAD}"' in prompt and "=== 범죄사실 ===" in prompt
+
+
+def test_verify_sees_questions_and_answers(fake, monkeypatch):
+    _compose(fake, monkeypatch)
+    prompt = fake.requests[1]["body"]["messages"][-1]["content"]
+    assert "사용자: 사건 개요" in prompt and "사용자: 네" in prompt and "질문: " in prompt
+
+
+def test_rewrite_loop_stops_at_the_limit(fake, monkeypatch):
+    """계속 근거 없는 표현이 나와도 상한에서 멈춘다."""
+    fake.verify_results = [[BAD], ["금원을"], ["금원을"]]
+    out = _compose(fake, monkeypatch, max_rewrites=2)
+    assert _kinds(fake) == ["compose", "verify", "rewrite", "verify", "rewrite"]
+    assert out["review"]["rewrites"] == 2
+
+
+def test_second_verify_can_pass(fake, monkeypatch):
+    fake.verify_results = [[BAD], []]
+    out = _compose(fake, monkeypatch, max_rewrites=2)
+    assert _kinds(fake) == ["compose", "verify", "rewrite", "verify"]
+    assert out["review"]["status"] == "rewritten" and out["review"]["rewrites"] == 1
+
+
+def test_verification_can_be_turned_off(fake, monkeypatch):
+    out = _compose(fake, monkeypatch, max_rewrites=0)
+    assert _kinds(fake) == ["compose"]
+    assert out["review"]["status"] == "off"
+
+
+def test_failed_verification_is_reported_not_hidden(fake, monkeypatch):
+    fake.fail_verify = True
+    out = _compose(fake, monkeypatch)
+    assert out["review"]["status"] == "unverified"
+    assert BAD in out["draft"]["sections"]["criminal_facts"]  # 초안은 그대로
+
+
+def test_failed_rewrite_keeps_the_draft_and_says_so(fake, monkeypatch):
+    fake.verify_results = [[BAD]]
+    fake.rewrite_text = ""
+    out = _compose(fake, monkeypatch)
+    assert out["review"]["status"] == "rewrite_failed"
+    assert [c["quote"] for c in out["review"]["unsupported"]] == [BAD]
+    assert BAD in out["draft"]["sections"]["criminal_facts"]
+
+
+def test_quote_not_in_the_draft_is_ignored(fake, monkeypatch):
+    fake.verify_results = [["초안에 없는 문장"]]
+    out = _compose(fake, monkeypatch)
+    assert _kinds(fake) == ["compose", "verify"]
+    assert out["review"]["status"] == "passed"

@@ -43,6 +43,8 @@ class Settings:
     # 정보 추출 호출의 추론 강도. 기본값 low의 근거는 eval/results/extract-low-dev10.md.
     # 지정하지 않던 이전 동작(모델 기본값)과 비교하려면 medium으로 둔다.
     OPENAI_EXTRACT_REASONING_EFFORT: str = _reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
+    # 초안을 대화와 대조해 근거 없는 표현을 고쳐 다시 쓰는 횟수의 상한. 0이면 검증하지 않는다.
+    DRAFT_MAX_REWRITES: int = int(os.getenv("DRAFT_MAX_REWRITES", "").strip() or "1")
     # 대화 상태(체크포인트) 저장소. 비우면 메모리에 두고 서비스가 재시작하면 사라진다.
     # 값을 넣으면 PostgreSQL에 저장하며, 이때 암호화 키가 없으면 서비스가 뜨지 않는다.
     CHECKPOINT_DB_URL: str = os.getenv("CHECKPOINT_DB_URL", "").strip()
