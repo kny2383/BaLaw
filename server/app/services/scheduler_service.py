@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.complaint import Complaint
+from app.services.ai_service import ai_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,15 +27,26 @@ class SchedulerService:
             ).all()
 
             if old_complaints:
-                deleted_count = len(old_complaints)
-                complaint_ids = [c.id for c in old_complaints]
+                complaint_ids = []
+                skipped_ids = []
 
-                # 고소장 삭제 (cascade로 chat_messages도 함께 삭제됨)
                 for complaint in old_complaints:
+                    # AI 서비스에 남은 대화 상태를 먼저 지운다. 실패한 건은 남겨 두고 다음 실행에서 다시 시도한다.
+                    if complaint.ai_session_id:
+                        try:
+                            ai_service.delete_session(complaint.ai_session_id)
+                        except RuntimeError as e:
+                            logger.error(f"Skip deleting complaint {complaint.id}: {e}")
+                            skipped_ids.append(complaint.id)
+                            continue
+                    # 고소장 삭제 (cascade로 chat_messages도 함께 삭제됨)
+                    complaint_ids.append(complaint.id)
                     db.delete(complaint)
 
                 db.commit()
-                logger.info(f"Deleted {deleted_count} old complaints (IDs: {complaint_ids}) - TTL: {self.ttl_days} days")
+                logger.info(f"Deleted {len(complaint_ids)} old complaints (IDs: {complaint_ids}) - TTL: {self.ttl_days} days")
+                if skipped_ids:
+                    logger.error(f"Kept {len(skipped_ids)} old complaints because AI session delete failed (IDs: {skipped_ids})")
             else:
                 logger.info("No old complaints to delete")
 

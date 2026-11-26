@@ -80,3 +80,120 @@ def test_chat_init_ai_failure_returns_503_and_keeps_complaint(client, db_session
     db_session.expire_all()
     assert db_session.get(Complaint, cid).ai_session_id is None
     assert db_session.query(ChatMessage).filter(ChatMessage.complaint_id == cid).count() == 0
+
+
+# ---------- 고소장을 지울 때 AI 서비스의 세션도 지운다 ----------
+def _with_session(db_session, complaint_id, session_id="ai-session-1"):
+    complaint = db_session.get(Complaint, complaint_id)
+    complaint.ai_session_id = session_id
+    db_session.commit()
+
+
+def _record_ai_deletes(monkeypatch, fail=False):
+    from app.services.ai_service import ai_service
+
+    calls = []
+
+    def fake_delete(session_id):
+        calls.append(session_id)
+        if fail:
+            raise RuntimeError("Baro-AI 세션 삭제 실패 (ConnectError)")
+
+    monkeypatch.setattr(ai_service, "delete_session", fake_delete)
+    return calls
+
+
+def test_delete_also_deletes_ai_session(client, db_session, user_tokens, monkeypatch):
+    calls = _record_ai_deletes(monkeypatch)
+    cid = create_complaint(client, user_tokens)
+    _with_session(db_session, cid)
+    assert client.delete(f"/api/complaints/{cid}", headers=auth_header(user_tokens)).status_code == 204
+    assert calls == ["ai-session-1"]
+
+
+def test_delete_without_ai_session_does_not_call_ai(client, user_tokens, monkeypatch):
+    calls = _record_ai_deletes(monkeypatch)
+    cid = create_complaint(client, user_tokens)
+    assert client.delete(f"/api/complaints/{cid}", headers=auth_header(user_tokens)).status_code == 204
+    assert calls == []
+
+
+def test_delete_is_refused_when_ai_session_cannot_be_deleted(client, db_session, user_tokens, monkeypatch):
+    """AI 쪽을 지우지 못하면 고소장도 남긴다. 고소장만 지우면 세션 ID를 잃어 다시 지울 방법이 없다."""
+    _record_ai_deletes(monkeypatch, fail=True)
+    cid = create_complaint(client, user_tokens)
+    _with_session(db_session, cid)
+    r = client.delete(f"/api/complaints/{cid}", headers=auth_header(user_tokens))
+    assert r.status_code == 503
+    assert "ConnectError" not in r.text, "내부 오류 문구를 그대로 내보내지 않는다"
+    db_session.expire_all()
+    assert db_session.get(Complaint, cid) is not None
+
+
+def test_other_user_delete_does_not_touch_ai_session(client, db_session, user_tokens, monkeypatch):
+    calls = _record_ai_deletes(monkeypatch)
+    cid = create_complaint(client, user_tokens)
+    _with_session(db_session, cid)
+    register(client, email="user2@example.com")
+    other = login(client, email="user2@example.com")
+    assert client.delete(f"/api/complaints/{cid}", headers=auth_header(other)).status_code == 404
+    assert calls == []
+
+
+def _expire(db_session, complaint_id, session_id=None):
+    from datetime import datetime, timedelta, timezone
+
+    complaint = db_session.get(Complaint, complaint_id)
+    complaint.downloaded_at = datetime.now(timezone.utc) - timedelta(days=2)
+    complaint.ai_session_id = session_id
+    db_session.commit()
+
+
+def _run_scheduler(db_session, monkeypatch):
+    from app.services import scheduler_service as module
+
+    monkeypatch.setattr(module, "SessionLocal", lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
+    module.scheduler_service.delete_old_complaints()
+    db_session.expire_all()
+
+
+def test_scheduler_deletes_ai_session_with_old_complaint(client, db_session, user_tokens, monkeypatch):
+    calls = _record_ai_deletes(monkeypatch)
+    old, fresh = create_complaint(client, user_tokens), create_complaint(client, user_tokens)
+    _expire(db_session, old, "ai-old")
+    _with_session(db_session, fresh, "ai-fresh")
+    _run_scheduler(db_session, monkeypatch)
+    assert calls == ["ai-old"]
+    assert db_session.get(Complaint, old) is None and db_session.get(Complaint, fresh) is not None
+
+
+def test_scheduler_keeps_complaint_when_ai_session_delete_fails(client, db_session, user_tokens, monkeypatch):
+    _record_ai_deletes(monkeypatch, fail=True)
+    with_session, without_session = create_complaint(client, user_tokens), create_complaint(client, user_tokens)
+    _expire(db_session, with_session, "ai-old")
+    _expire(db_session, without_session)
+    _run_scheduler(db_session, monkeypatch)
+    assert db_session.get(Complaint, with_session) is not None, "AI 쪽을 지우지 못한 건은 다음 실행까지 남긴다"
+    assert db_session.get(Complaint, without_session) is None
+
+
+def test_ai_client_delete_session(monkeypatch):
+    """AI 클라이언트가 올바른 주소로 DELETE를 보내고, 실패를 RuntimeError로 올린다."""
+    import httpx
+    import pytest
+
+    from app.services.ai_service import ai_service
+
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path))
+        return httpx.Response(204 if request.url.path.endswith("/ok") else 500)
+
+    real_client = httpx.Client
+    monkeypatch.setattr(httpx, "Client", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw))
+    ai_service.delete_session("ok")
+    with pytest.raises(RuntimeError):
+        ai_service.delete_session("broken")
+    assert seen == [("DELETE", "/chat/ok"), ("DELETE", "/chat/broken")]

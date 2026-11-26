@@ -237,5 +237,21 @@ class BaroAIService:
             raise RuntimeError(f"예상치 못한 오류: {str(e)}")
 
 
+    def delete_session(self, session_id: str) -> None:
+        """Baro-AI에 저장된 세션(대화 상태, 판례 검색 결과)을 지운다.
+
+        AI는 없는 세션에도 204로 답하므로, 실패는 연결 오류나 서버 오류뿐이다.
+        고소장 삭제 요청과 삭제 스케줄러가 함께 쓰도록 동기 함수로 둔다.
+        """
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.delete(f"{self.base_url}/chat/{session_id}")
+                response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"Baro-AI 세션 삭제 실패 ({e.response.status_code})")
+        except httpx.HTTPError as e:
+            raise RuntimeError(f"Baro-AI 세션 삭제 실패 ({type(e).__name__})")
+
+
 # 싱글톤 인스턴스
 ai_service = BaroAIService()
