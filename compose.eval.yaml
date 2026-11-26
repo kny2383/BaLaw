@@ -30,6 +30,9 @@ services:
       #   작성·대화 모델이 모두 gpt-5-mini다 (cfg.py의 기본값 gpt-5는 운영에서 쓰이지 않음).
       #   2026-11-25 기록 장치 로그에서 gpt-5-mini 요청의 응답 모델이 gpt-5-mini-2025-08-07이었다.
       OPENAI_MODEL: ${EVAL_SERVICE_MODEL:-gpt-5-mini-2025-08-07}
+      # 정보 추출 호출의 추론 강도를 바꿔 비교할 때 지정한다. 비우면 모델 기본값.
+      #   EVAL_EXTRACT_REASONING_EFFORT=low docker compose -f compose.yaml -f compose.eval.yaml up -d --build ai
+      OPENAI_EXTRACT_REASONING_EFFORT: ${EVAL_EXTRACT_REASONING_EFFORT:-}
     depends_on:
       llm-proxy:
         condition: service_healthy
