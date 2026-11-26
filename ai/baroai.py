@@ -7,13 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Literal, Optional
 from cfg import settings
-from flow.chat_graph import build_chat_graph
+from flow.chat_graph import build_chat_graph, claims_to_confirm
 from flow.checkpoint import chat_config, delete_session, prune_session, rag_config
 from flow.rag_graph import build_rag_graph, failed_result
 from services import pii
 from services.openai_client import StructuredOutputError
 from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
+from langgraph.types import Command
 
 app = FastAPI(title="BARO-AI: Complaint Draft API", version="0.1.0")
 
@@ -41,6 +42,11 @@ class FollowupRequest(BaseModel):
 
 class ComposeRequest(BaseModel):
     session_id: str
+
+class ComposeConfirmRequest(BaseModel):
+    session_id: str
+    # 확인을 요청받은 표현(verification.to_confirm)과 같은 순서. true = 사용자가 겪은 사실이 맞다.
+    answers: list[bool]
 
 class ChatInitRequest(BaseModel):
     text: str
@@ -235,17 +241,49 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
     }
 
 
+def _awaiting_confirmation(session_id: str) -> bool:
+    """작성이 사용자 확인을 기다리며 멈춰 있는가."""
+    return CHAT_GRAPH.get_state(chat_config(session_id)).next == ("confirm",)
+
+
+def _compose_response(session_id: str, out: dict) -> dict:
+    """작성 결과. 초안과 검증 결과(인용, 이유) 안의 표식을 원래 값으로 되돌린다.
+
+    verification.status: passed(근거 없는 표현 없음) | rewritten(고쳐 씀) | flagged(남아 있음)
+                         | unverified(검증 호출 실패) | rewrite_failed | off
+                         | awaiting_confirmation(사용자 확인을 기다림) | confirmed(사용자가 모두 사실이라고 답함)
+    verification.rechecked: 고쳐 쓴 초안을 다시 검증했는가. 기본 상한(1)에서는 다시 검증하지 않으므로 False다.
+    verification.to_confirm: 확인을 기다릴 때만 있다. /chat/compose/confirm에 이 순서대로 답한다.
+    """
+    review = out["review"]
+    if _awaiting_confirmation(session_id):
+        # 아직 고치지 않은 초안을 함께 돌려준다. 화면은 표현이 놓인 문맥을 보여 줄 수 있다.
+        review = {**review, "status": "awaiting_confirmation", "to_confirm": claims_to_confirm(review)}
+    return pii.unmask({**out["draft"], "verification": review}, out.get("pii"))
+
+
 @app.post("/chat/compose")
 def chat_compose(req: ComposeRequest):
     state = _session(req.session_id)
     request = {"action": "compose", "offense": _offense_from_rag(req.session_id, state)}
+    # 확인을 기다리던 중에 다시 작성을 요청하면 처음부터 새로 쓴다 (기다리던 확인은 버린다).
     out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
     prune_session(req.session_id)
-    # verification.status: passed(근거 없는 표현 없음) | rewritten(고쳐 씀) | flagged(남아 있음)
-    #                      | unverified(검증 호출 실패) | rewrite_failed | off
-    # verification.rechecked: 고쳐 쓴 초안을 다시 검증했는가. 기본 상한(1)에서는 다시 검증하지 않으므로 False다.
-    # 초안과 검증 결과(인용, 이유) 안의 표식을 원래 값으로 되돌린다.
-    return pii.unmask({**out["draft"], "verification": out["review"]}, out.get("pii"))
+    return _compose_response(req.session_id, out)
+
+
+@app.post("/chat/compose/confirm")
+def chat_compose_confirm(req: ComposeConfirmRequest):
+    """확인을 기다리며 멈춘 작성을 사용자의 답으로 이어 간다."""
+    state = _session(req.session_id)
+    if not _awaiting_confirmation(req.session_id):
+        raise HTTPException(409, "확인을 기다리는 초안이 없습니다. /chat/compose 먼저 호출하세요.")
+    expected = len(claims_to_confirm(state["review"]))
+    if len(req.answers) != expected:
+        raise HTTPException(400, f"답은 {expected}개여야 합니다.")
+    out = CHAT_GRAPH.invoke(Command(resume=req.answers), chat_config(req.session_id))
+    prune_session(req.session_id)
+    return _compose_response(req.session_id, out)
 
 
 @app.delete("/chat/{session_id}", status_code=204)

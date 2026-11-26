@@ -86,7 +86,7 @@ def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify, rou
             continue
         proxy_control({"case_id": r["id"]})
         state = {"history": history_of(r), "draft": {k: body[k] for k in ("offense", "title", "sections")},
-                 "review": {"status": "pending", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}}
+                 "review": {"status": "pending", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": [], "confirmed": []}}
         t0 = time.time()
         state.update(verify(state))
         # 서비스 그래프와 같은 분기를 따른다 (반복 상한은 DRAFT_MAX_REWRITES).

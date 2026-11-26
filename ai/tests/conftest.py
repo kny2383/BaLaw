@@ -18,6 +18,7 @@ os.environ["REDIS_URL"] = ""
 os.environ["OPENAI_EXTRACT_REASONING_EFFORT"] = "low"
 os.environ["DRAFT_MAX_REWRITES"] = "1"
 os.environ["PII_MASKING"] = "1"
+os.environ["DRAFT_CONFIRM"] = "0"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

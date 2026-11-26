@@ -1,4 +1,4 @@
-"""대화 그래프: 추출 → 질문 선택, 그리고 작성 → 검증 → 재작성.
+"""대화 그래프: 추출 → 질문 선택, 그리고 작성 → 검증 → (사용자 확인) → 재작성.
 
 요청 하나가 그래프 실행 한 번이다. 상태는 체크포인터가 세션(thread)별로 이어 준다.
 
@@ -7,12 +7,20 @@
           └─ compose ─▶ compose ─▶ verify ─┬─ 근거 없는 표현 없음 ─▶ 끝
                                   ▲        └─ 있음 ─▶ rewrite ─┬─ 횟수 남음 ─▶ verify
                                   └────────────────────────────┘└─ 상한 ─▶ 끝
+
+DRAFT_CONFIRM이 켜져 있으면 verify와 rewrite 사이에 confirm이 들어간다. confirm은 실행을 멈추고
+(interrupt) 사용자의 답을 기다린다. 답이 오면 멈춘 자리에서 이어서, 사용자가 사실이 아니라고 한
+표현만 rewrite로 보낸다. 멈춘 상태는 체크포인터에 남으므로 서비스가 재시작해도 이어 갈 수 있다.
+
+    verify ─ 있음 ─▶ confirm ─(멈춤, 답을 받음)─┬─ 사실이 아닌 표현 있음 ─▶ rewrite
+                                                └─ 모두 사실 ─▶ 끝
 """
 from __future__ import annotations
 
 import copy
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import interrupt
 
 from cfg import settings
 from flow.checkpoint import get_checkpointer
@@ -127,7 +135,8 @@ def compose(state: ChatState) -> dict:
     draft = compose_complaint(meta=meta, collected=state.get("collected", {}), evidence=[])
     status = "pending" if settings.DRAFT_MAX_REWRITES > 0 else "off"
     return {"offense": offense, "draft": draft,
-            "review": {"status": status, "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}}
+            "review": {"status": status, "rewrites": 0, "rechecked": False, "unsupported": [], "removed": [],
+                       "confirmed": []}}
 
 
 def verify(state: ChatState) -> dict:
@@ -158,9 +167,43 @@ def rewrite(state: ChatState) -> dict:
     return {
         "draft": {**state["draft"], "sections": sections},
         # 고쳐 쓴 초안은 아직 다시 검증하지 않았다. 다시 검증하면 verify가 rechecked를 True로 바꾼다.
-        "review": {"status": "rewritten", "rewrites": review["rewrites"] + 1, "rechecked": False,
+        "review": {**review, "status": "rewritten", "rewrites": review["rewrites"] + 1, "rechecked": False,
                    "unsupported": [], "removed": review["removed"] + review["unsupported"]},
     }
+
+
+CONFIRM_PREFIX = "고소장 초안의 다음 내용은 사실이 맞습니다: "
+
+
+def claims_to_confirm(review: dict) -> list[dict]:
+    """사용자에게 물을 표현. 한 번에 묻는 개수에 상한을 두고, 넘는 것은 묻지 않고 고친다."""
+    return review["unsupported"][:settings.DRAFT_CONFIRM_MAX]
+
+
+def confirm(state: ChatState) -> dict:
+    """검증이 찾은 표현이 사실인지 사용자에게 묻는다 (LLM 호출 없음).
+
+    interrupt에서 실행이 멈추고, 답이 오면 이 노드가 처음부터 다시 실행되어 interrupt가 그 답을 돌려준다.
+    답은 묻는 표현과 같은 순서의 참/거짓 목록이다 (참 = 사용자가 겪은 사실이 맞다).
+    멈출 때 넘기는 값에는 대화 글을 넣지 않는다. 물을 표현은 상태(review)에서 읽는다.
+    """
+    review = dict(state["review"])
+    asked = claims_to_confirm(review)
+    # 형식이 틀린 답은 받지 않고 다시 멈춘다. 여기서 예외를 내면 틀린 답이 저장된 채 남아 다음 답을 가린다.
+    while True:
+        answers = interrupt({"count": len(asked)})
+        if isinstance(answers, list) and len(answers) == len(asked) and all(isinstance(a, bool) for a in answers):
+            break
+
+    kept = [c for c, yes in zip(asked, answers) if yes]
+    denied = [c for c, yes in zip(asked, answers) if not yes] + review["unsupported"][len(asked):]
+    update: dict = {"review": {**review, "status": "flagged" if denied else "confirmed",
+                               "unsupported": denied, "confirmed": review["confirmed"] + kept}}
+    if kept:
+        # 사용자가 사실이라고 답한 내용은 사용자의 말이므로 대화 기록에 남긴다. 다시 검증할 때 근거가 된다.
+        said = CONFIRM_PREFIX + " / ".join(c["quote"] for c in kept)
+        update["history"] = state["history"] + [{"role": "user", "content": said}]
+    return update
 
 
 def route_after_compose(state: ChatState) -> str:
@@ -169,7 +212,13 @@ def route_after_compose(state: ChatState) -> str:
 
 def route_after_verify(state: ChatState) -> str:
     review = state["review"]
-    return "rewrite" if review["status"] == "flagged" and review["rewrites"] < settings.DRAFT_MAX_REWRITES else END
+    if review["status"] != "flagged" or review["rewrites"] >= settings.DRAFT_MAX_REWRITES:
+        return END
+    return "confirm" if settings.DRAFT_CONFIRM else "rewrite"
+
+
+def route_after_confirm(state: ChatState) -> str:
+    return "rewrite" if state["review"]["unsupported"] else END
 
 
 def route_after_rewrite(state: ChatState) -> str:
@@ -191,6 +240,8 @@ def build_chat_graph(checkpointer=None):
     g.add_node("verify", verify)
     g.add_node("rewrite", rewrite)
     g.add_conditional_edges("compose", route_after_compose, {"verify": "verify", END: END})
-    g.add_conditional_edges("verify", route_after_verify, {"rewrite": "rewrite", END: END})
+    g.add_node("confirm", confirm)
+    g.add_conditional_edges("verify", route_after_verify, {"confirm": "confirm", "rewrite": "rewrite", END: END})
+    g.add_conditional_edges("confirm", route_after_confirm, {"rewrite": "rewrite", END: END})
     g.add_conditional_edges("rewrite", route_after_rewrite, {"verify": "verify", END: END})
     return g.compile(checkpointer=checkpointer or get_checkpointer())

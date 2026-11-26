@@ -163,6 +163,49 @@ def test_prune_keeps_only_latest_state(schema, fake, monkeypatch):
     _close(saver)
 
 
+def _stop_at_confirm(saver, fake, monkeypatch):
+    """사용자 확인을 기다리며 멈춘 세션을 만든다."""
+    from cfg import settings
+
+    monkeypatch.setattr(settings, "DRAFT_CONFIRM", True)
+    chat = build_chat_graph(saver)
+    cfg = checkpoint.chat_config(SID)
+    chat.invoke({"request": {"action": "init", "text": NARRATIVE, "offense": "fraud", "offense_selected": True}}, cfg)
+    chat.invoke({"request": {"action": "message", "message": MESSAGE}}, cfg)
+    fake.verify_results = [["피고소인에게"]]
+    chat.invoke({"request": {"action": "compose"}}, cfg)
+    assert chat.get_state(cfg).next == ("confirm",)
+    return cfg
+
+
+def test_waiting_confirmation_survives_prune_and_restart(schema, fake, monkeypatch):
+    """확인을 기다리는 동안 지난 단계를 정리하고 서비스가 재시작해도, 답을 받으면 이어서 고쳐 쓴다."""
+    from langgraph.types import Command
+
+    saver = _saver(schema)
+    cfg = _stop_at_confirm(saver, fake, monkeypatch)
+    checkpoint.prune_session(SID, checkpointer=saver)
+    assert _rows(schema, "checkpoints", SID) == 1
+    _close(saver)
+
+    saver = _saver(schema)
+    chat = build_chat_graph(saver)
+    assert chat.get_state(cfg).next == ("confirm",)
+    out = chat.invoke(Command(resume=[False]), cfg)
+    assert out["review"]["status"] == "rewritten"
+    assert "피고소인에게" not in out["draft"]["sections"]["criminal_facts"]
+    _close(saver)
+
+
+def test_waiting_confirmation_stores_no_plain_text(schema, fake, monkeypatch):
+    saver = _saver(schema)
+    _stop_at_confirm(saver, fake, monkeypatch)
+    stored = _stored_bytes(schema)
+    leaked = [s for s in SECRETS if s.encode("utf-8") in stored]
+    assert leaked == [], f"암호화되지 않은 채 저장된 글: {leaked}"
+    _close(saver)
+
+
 def test_delete_removes_every_row_of_the_session(schema, fake, monkeypatch):
     saver = _saver(schema)
     _run_conversation(saver, fake, monkeypatch)

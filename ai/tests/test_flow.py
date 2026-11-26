@@ -4,6 +4,7 @@ import typing
 
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 
 from flow.chat_graph import DONE_REPLY, build_chat_graph, route_request, select_question
 from loaders.detail_loader import get_detail_schema
@@ -156,7 +157,7 @@ def test_graph_has_verify_and_rewrite_nodes():
 def test_clean_draft_is_not_rewritten(fake, monkeypatch):
     out = _compose(fake, monkeypatch)
     assert _kinds(fake) == ["compose", "verify"]
-    assert out["review"] == {"status": "passed", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}
+    assert out["review"] == {"status": "passed", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": [], "confirmed": []}
     assert BAD in out["draft"]["sections"]["criminal_facts"]
 
 
@@ -223,3 +224,106 @@ def test_quote_not_in_the_draft_is_ignored(fake, monkeypatch):
     out = _compose(fake, monkeypatch)
     assert _kinds(fake) == ["compose", "verify"]
     assert out["review"]["status"] == "passed"
+
+
+# ---------- 사용자 확인 (interrupt) ----------
+OTHER = "금원을"  # 가짜 초안에 들어 있는 다른 표현
+
+
+def _compose_with_confirm(fake, monkeypatch, found, max_rewrites=1, confirm_max=5):
+    """확인을 켠 채 작성을 요청한다. 그래프와 멈춘 뒤의 결과를 돌려준다."""
+    from cfg import settings
+    monkeypatch.setattr(settings, "DRAFT_MAX_REWRITES", max_rewrites)
+    monkeypatch.setattr(settings, "DRAFT_CONFIRM", True)
+    monkeypatch.setattr(settings, "DRAFT_CONFIRM_MAX", confirm_max)
+    fake.verify_results = found
+    saver = InMemorySaver()
+    graph = build_chat_graph(saver)
+    graph.invoke(INIT, CONFIG)
+    graph.invoke({"request": {"action": "message", "message": "네"}}, CONFIG)
+    fake.requests.clear()
+    return saver, graph, graph.invoke({"request": {"action": "compose"}}, CONFIG)
+
+
+def test_confirm_stops_before_rewriting(fake, monkeypatch):
+    _, graph, out = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    assert _kinds(fake) == ["compose", "verify"], "답을 받기 전에는 고쳐 쓰지 않는다"
+    assert graph.get_state(CONFIG).next == ("confirm",)
+    assert out["review"]["status"] == "flagged" and BAD in out["draft"]["sections"]["criminal_facts"]
+    # 멈출 때 넘기는 값에는 대화 글이 없다.
+    assert [i.value for i in out["__interrupt__"]] == [{"count": 1}]
+
+
+def test_confirm_is_skipped_when_nothing_is_found(fake, monkeypatch):
+    _, graph, out = _compose_with_confirm(fake, monkeypatch, [])
+    assert graph.get_state(CONFIG).next == () and out["review"]["status"] == "passed"
+
+
+def test_denied_claim_is_rewritten(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    out = graph.invoke(Command(resume=[False]), CONFIG)
+    assert _kinds(fake) == ["compose", "verify", "rewrite"]
+    assert out["review"]["status"] == "rewritten" and out["review"]["confirmed"] == []
+    assert [c["quote"] for c in out["review"]["removed"]] == [BAD]
+    assert BAD not in out["draft"]["sections"]["criminal_facts"]
+    assert graph.get_state(CONFIG).next == ()
+
+
+def test_confirmed_claim_stays_and_becomes_what_the_user_said(fake, monkeypatch):
+    _, graph, before = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    out = graph.invoke(Command(resume=[True]), CONFIG)
+    assert _kinds(fake) == ["compose", "verify"], "모두 사실이면 고쳐 쓰지 않는다"
+    assert out["review"]["status"] == "confirmed" and out["review"]["unsupported"] == []
+    assert [c["quote"] for c in out["review"]["confirmed"]] == [BAD]
+    assert out["draft"] == before["draft"]
+    assert out["history"][-1]["role"] == "user" and BAD in out["history"][-1]["content"]
+
+
+def test_only_denied_claims_go_to_rewrite(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER]])
+    out = graph.invoke(Command(resume=[True, False]), CONFIG)
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f'"{OTHER}"' in prompt and f'"{BAD}"' not in prompt
+    assert [c["quote"] for c in out["review"]["confirmed"]] == [BAD]
+    assert [c["quote"] for c in out["review"]["removed"]] == [OTHER]
+
+
+def test_claims_over_the_limit_are_rewritten_without_asking(fake, monkeypatch):
+    _, graph, out = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER]], confirm_max=1)
+    assert [i.value for i in out["__interrupt__"]] == [{"count": 1}]
+    out = graph.invoke(Command(resume=[True]), CONFIG)
+    assert [c["quote"] for c in out["review"]["confirmed"]] == [BAD]
+    assert [c["quote"] for c in out["review"]["removed"]] == [OTHER]
+
+
+def test_wrong_answer_shape_is_rejected_and_the_question_stays(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    for wrong in ([True, False], "yes", [1]):
+        out = graph.invoke(Command(resume=wrong), CONFIG)
+        assert graph.get_state(CONFIG).next == ("confirm",) and out["review"]["status"] == "flagged"
+    assert _kinds(fake) == ["compose", "verify"]
+    assert graph.invoke(Command(resume=[False]), CONFIG)["review"]["status"] == "rewritten"
+
+
+def test_waiting_confirmation_survives_a_new_graph_object(fake, monkeypatch):
+    """멈춘 상태는 체크포인터에 있다. 서비스가 재시작해도 답을 받아 이어 간다."""
+    saver, _, _ = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    graph = build_chat_graph(saver)
+    assert graph.get_state(CONFIG).next == ("confirm",)
+    assert graph.invoke(Command(resume=[False]), CONFIG)["review"]["status"] == "rewritten"
+
+
+def test_second_verify_uses_the_confirmation(fake, monkeypatch):
+    """다시 검증할 때 사용자가 사실이라고 답한 내용이 대화에 들어 있다."""
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER], []], max_rewrites=2)
+    out = graph.invoke(Command(resume=[True, False]), CONFIG)
+    assert _kinds(fake) == ["compose", "verify", "rewrite", "verify"]
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f"사실이 맞습니다: {BAD}" in prompt
+    assert out["review"]["status"] == "rewritten" and out["review"]["rechecked"] is True
+
+
+def test_new_request_discards_a_waiting_confirmation(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    graph.invoke({"request": {"action": "message", "message": "추가로 말씀드립니다"}}, CONFIG)
+    assert graph.get_state(CONFIG).next == ()
