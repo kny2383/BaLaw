@@ -6,6 +6,7 @@ import CharacterModal from '@/shared/ui/CharacterModal';
 import Footer from '@/shared/ui/Footer';
 import GeneratingModal from '@/shared/ui/GeneratingModal';
 import Header from '@/shared/ui/Header';
+import Button from '@/shared/ui/common/Button';
 
 import type { ComplainantInfoCreate } from '@/features/complaint/apis/complaints';
 import type { RagCase } from '@/features/complaint/apis/complaints';
@@ -119,6 +120,8 @@ const ComplaintWizardPage: React.FC = () => {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   // 확인을 물은 횟수. 같은 표현을 다시 물어도 창을 새로 만들어 이전 답이 남지 않게 한다
   const [confirmRound, setConfirmRound] = useState(0);
+  // 대화는 끝났는데 초안이 완성되지 않은 이유. 생성에 실패했거나 확인 창을 닫았을 때 다시 시작할 길을 보여 준다
+  const [pendingDraft, setPendingDraft] = useState<'failed' | 'unanswered' | null>(null);
 
   const handleConfirmSubmit = async (answers: boolean[]) => {
     if (!complaintId) return;
@@ -278,6 +281,7 @@ const ComplaintWizardPage: React.FC = () => {
       if (generatingRef.current) return;
       generatingRef.current = true;
 
+      setPendingDraft(null);
       // 버튼 누르는 즉시 모달 띄우기
       setShowGeneratingModal(true);
       setIsGenerating(true);
@@ -301,6 +305,8 @@ const ComplaintWizardPage: React.FC = () => {
         nextRaw(); // → step 9 (ComplaintPreviewSection)
       } catch (e) {
         console.error('failed to generate complaint', e);
+        // 대화가 끝나면 입력창이 잠기므로, 알리지 않으면 사용자는 멈춘 화면만 보게 된다
+        setPendingDraft('failed');
         // 실패 시에도 모달은 닫아줌
         setShowGeneratingModal(false);
         setIsGenerating(false);
@@ -630,6 +636,30 @@ const ComplaintWizardPage: React.FC = () => {
               </aside>
             </div>
           )}
+        {step === 6 && pendingDraft && !isGenerating && !claimsToConfirm && (
+          <div
+            role={pendingDraft === 'failed' ? 'alert' : 'status'}
+            className={[
+              'mt-3 flex shrink-0 items-center justify-between gap-4 rounded-xl border px-5 py-3',
+              pendingDraft === 'failed'
+                ? 'border-warning-100 bg-warning-0'
+                : 'border-neutral-200 bg-neutral-50',
+            ].join(' ')}
+          >
+            <p className="text-body-3-regular text-neutral-800">
+              {pendingDraft === 'failed'
+                ? '고소장 초안을 만들지 못했어요. 대화 내용은 그대로 남아 있어요. 잠시 후 다시 시도해 주세요.'
+                : '초안이 아직 완성되지 않았어요. 다시 만들면 확인할 내용을 새로 여쭤볼게요.'}
+            </p>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleNext}
+            >
+              {pendingDraft === 'failed' ? '다시 시도' : '초안 만들기'}
+            </Button>
+          </div>
+        )}
         {/* 9: 완성된 고소장 미리보기 */}
         {typeof complaintId === 'number' &&
           Number.isFinite(complaintId) &&
@@ -671,7 +701,10 @@ const ComplaintWizardPage: React.FC = () => {
             isSubmitting={isConfirming}
             errorMessage={confirmError}
             onSubmit={handleConfirmSubmit}
-            onClose={() => setClaimsToConfirm(null)}
+            onClose={() => {
+              setClaimsToConfirm(null);
+              setPendingDraft('unanswered');
+            }}
           />
         )}
       </main>
