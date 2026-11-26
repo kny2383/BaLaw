@@ -47,6 +47,7 @@ def init_session(state: ChatState) -> dict:
         "offense_selected": req["offense_selected"],
         "history": [{"role": "user", "content": req["text"]}],
         "collected": {},
+        "pii": req.get("pii") or {},
     }
 
 
@@ -83,6 +84,8 @@ def extract(state: ChatState) -> dict:
         "offense": offense,
         "history": history,
         "collected": {"elements": elements, "details": details},
+        # 이번 발화에서 새로 생긴 표식. 추출이 실패하면 발화와 함께 저장되지 않는다.
+        "pii": state["request"].get("pii") or state.get("pii") or {},
     }
 
 

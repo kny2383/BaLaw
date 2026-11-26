@@ -50,6 +50,7 @@ class FakeOpenAI:
         self.verify_results: list[list[str]] = []  # 검증 호출마다 차례로 돌려줄 "근거 없는 표현" 목록. 비면 없음
         self.fail_verify = False      # True면 초안 검증 요청에 400을 돌려준다
         self.rewrite_text = REWRITE_TEXT
+        self.compose_text = COMPOSE_TEXT
 
     def close(self) -> None:
         self._server.shutdown()
@@ -84,7 +85,7 @@ class FakeOpenAI:
             if "revise a draft" in text:
                 content = self.rewrite_text
             elif "drafting assistant" in text:
-                content = COMPOSE_TEXT
+                content = self.compose_text
             elif "죄목 리스트" in text:
                 if self.fail_keyword:
                     return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}

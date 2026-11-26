@@ -1,3 +1,5 @@
+import copy
+
 from fastapi import BackgroundTasks, HTTPException, Response
 from uuid import uuid4
 from fastapi import FastAPI
@@ -8,6 +10,7 @@ from cfg import settings
 from flow.chat_graph import build_chat_graph
 from flow.checkpoint import chat_config, delete_session, prune_session, rag_config
 from flow.rag_graph import build_rag_graph, failed_result
+from services import pii
 from services.openai_client import StructuredOutputError
 from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
@@ -42,6 +45,9 @@ class ComposeRequest(BaseModel):
 class ChatInitRequest(BaseModel):
     text: str
     offense: Optional[str] = None
+    # 호출하는 쪽이 이미 알고 있는 식별정보 (입력 화면의 이름, 주소 등). 서술에서 찾아 표식으로 바꾼다.
+    # {"names": [...], "addresses": [...], "phones": [...], "accounts": [...]}
+    known_pii: Optional[dict[str, list[str]]] = None
 
 class ChatMessageRequest(BaseModel):
     session_id: str
@@ -53,6 +59,7 @@ class ChatHistoryItem(BaseModel):
 
 class ChatRestoreRequest(BaseModel):
     history: list[ChatHistoryItem]
+    known_pii: Optional[dict[str, list[str]]] = None
 
 @app.get("/")
 def health():
@@ -86,13 +93,13 @@ def _session(session_id: str) -> dict:
     return values
 
 
-def _rag(session_id: str) -> dict:
-    """판례 검색 상태. 아직 끝나지 않았으면 pending."""
+def _rag(session_id: str, pii_state: Optional[dict] = None) -> dict:
+    """판례 검색 상태. 아직 끝나지 않았으면 pending. pii_state를 주면 판례 요약 안의 표식을 되돌린다."""
     result = RAG_GRAPH.get_state(rag_config(session_id)).values.get("result") or {}
     return {
         "rag_status": result.get("status", "pending"),
         "rag_keyword": result.get("keyword"),
-        "rag_cases": result.get("cases") or [],
+        "rag_cases": pii.unmask(result.get("cases") or [], pii_state),
     }
 
 
@@ -106,14 +113,20 @@ def _offense_from_rag(session_id: str, state: dict):
     return map_keyword_to_offense(rag["rag_keyword"])
 
 
-def _create_session(session_id: str, text: str, offense: Optional[str] = None) -> dict:
+def _create_session(session_id: str, text: str, offense: Optional[str] = None,
+                    known_pii: Optional[dict] = None) -> dict:
+    """세션을 만든다. 서술의 식별정보는 표식으로 바꿔 저장한다 (돌려주는 상태의 history가 바뀐 글이다)."""
     selected_offense = _normalize_offense(offense)
+    pii_state = pii.new_state(known_pii) if settings.PII_MASKING else {}
+    if pii_state:
+        text = pii.mask(text, pii_state)
     return CHAT_GRAPH.invoke(
         {"request": {
             "action": "init",
             "text": text,
             "offense": selected_offense or "fraud",
             "offense_selected": bool(selected_offense),
+            "pii": pii_state,
         }},
         chat_config(session_id),
     )
@@ -144,7 +157,12 @@ def _progress_from_session(s: dict) -> dict:
 
 def _send_to_session(session_id: str, message: str) -> dict:
     state = _session(session_id)
-    request = {"action": "message", "message": message, "offense": _offense_from_rag(session_id, state)}
+    # 발화의 식별정보를 표식으로 바꾼다. 새 표식은 추출이 성공해야 발화와 함께 저장된다.
+    pii_state = copy.deepcopy(state.get("pii") or {})
+    if pii_state:
+        message = pii.mask(message, pii_state)
+    request = {"action": "message", "message": message, "pii": pii_state,
+               "offense": _offense_from_rag(session_id, state)}
 
     # 추출이 실패하면 그래프는 이번 발화를 저장하지 않는다. 오류로 알리고, 다시 보내면 같은 상태에서 이어진다.
     try:
@@ -155,26 +173,28 @@ def _send_to_session(session_id: str, message: str) -> dict:
 
     prune_session(session_id)
     collected, result = out["collected"], out["result"]
-    return {
+    # 사용자에게 돌려주는 글에서는 표식을 원래 값으로 되돌린다.
+    return pii.unmask({
         "session_id": session_id,
         "reply": result["reply"],
         "caution": result["caution"],
         "progress": {"complete": result["complete"], "elements": collected["elements"], "details": collected["details"]},
-    }
+    }, out.get("pii"))
 
 @app.post("/chat/init")
 def chat_init(req: ChatInitRequest, background_tasks: BackgroundTasks):
     sid = str(uuid4())
-    state = _create_session(sid, req.text, req.offense)
-    background_tasks.add_task(_load_rag_preview, sid, req.text)
+    state = _create_session(sid, req.text, req.offense, req.known_pii)
+    # 판례 검색에도 표식으로 바꾼 서술을 쓴다.
+    background_tasks.add_task(_load_rag_preview, sid, state["history"][0]["content"])
 
     return {"session_id": sid, "offense": state["offense"], **_rag(sid)}
 
 
 @app.get("/chat/rag/{session_id}")
 def chat_rag(session_id: str):
-    _session(session_id)
-    return {"session_id": session_id, **_rag(session_id)}
+    state = _session(session_id)
+    return {"session_id": session_id, **_rag(session_id, state.get("pii"))}
 
 
 @app.post("/chat/send")
@@ -194,8 +214,8 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
         raise HTTPException(400, "복원할 사용자 메시지가 없습니다.")
 
     sid = str(uuid4())
-    state = _create_session(sid, user_messages[0])
-    background_tasks.add_task(_load_rag_preview, sid, user_messages[0])
+    state = _create_session(sid, user_messages[0], known_pii=req.known_pii)
+    background_tasks.add_task(_load_rag_preview, sid, state["history"][0]["content"])
 
     last_response = None
     try:
@@ -209,8 +229,9 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
     return {
         "session_id": sid,
         "offense": state["offense"],
-        **_rag(sid),
-        "progress": last_response["progress"] if last_response else _progress_from_session(state),
+        **_rag(sid, _session(sid).get("pii")),
+        "progress": last_response["progress"] if last_response
+        else pii.unmask(_progress_from_session(state), state.get("pii")),
     }
 
 
@@ -223,7 +244,8 @@ def chat_compose(req: ComposeRequest):
     # verification.status: passed(근거 없는 표현 없음) | rewritten(고쳐 씀) | flagged(남아 있음)
     #                      | unverified(검증 호출 실패) | rewrite_failed | off
     # verification.rechecked: 고쳐 쓴 초안을 다시 검증했는가. 기본 상한(1)에서는 다시 검증하지 않으므로 False다.
-    return {**out["draft"], "verification": out["review"]}
+    # 초안과 검증 결과(인용, 이유) 안의 표식을 원래 값으로 되돌린다.
+    return pii.unmask({**out["draft"], "verification": out["review"]}, out.get("pii"))
 
 
 @app.delete("/chat/{session_id}", status_code=204)

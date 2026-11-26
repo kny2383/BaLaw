@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Any
 
 from cfg import settings
 from services.openai_client import respond, respond_parsed
+from services.pii import PROMPT_NOTE as PII_PROMPT_NOTE
 from schemas.extraction import extraction_model
 from loaders.offense_loader import get_offense_meta
 from loaders.detail_loader import get_detail_schema
@@ -28,6 +29,9 @@ NEUTRAL_SYSTEM = (
     "You are an assistant that extracts facts for a legal complaint draft. "
     "Do not give legal advice. Use ONLY the user's text."
 )
+
+# 식별정보 치환을 켰을 때만 프롬프트에 표식 안내를 붙인다. 끄면 프롬프트는 이전과 같다.
+PII_NOTE = PII_PROMPT_NOTE if settings.PII_MASKING else ""
 
 COMPOSE_SYSTEM = (
     "You are a drafting assistant for Korean criminal complaints.\n"
@@ -88,6 +92,7 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
     return (
         "아래 '법적 구성요건(elements)'과 '디테일(details)' 스키마에 따라, 사용자의 서술을 **매우 보수적**으로 평가하세요.\n"
         "- 텍스트에 **명시**되지 않거나 아직 언급이 없으면 추론하지 말고 'missing'으로 표기\n"
+        + PII_NOTE +
         "-**[증거 추측 절대 금지]** 사용자가 단순히 '캡처해뒀다', '증거 있다'라고만 한 경우, 'summary'나 'evidence'에 '송금 내역', '채팅 캡처' 등 사용자가 직접 입 밖으로 꺼내지 않은 구체적인 단어를 임의로 지어내어(환각) 기재하지 마십시오.\n"
         "- '쯤/경/대략', '확실하지 않다' 등의 표현이 섞여 있더라도, 해당 항목에 필요한 구체적인 데이터가 제공되었다면 'present'로 인정하세요.\n"
         "- 단, 주의하세요! '시간(예: 6시 15분)'만 있고 '정확한 날짜(예: 몇 월 몇 일)'는 없는 경우처럼, 해당 슬롯이 요구하는 **핵심 정보가 누락된 경우에는 통과시키지 말고 반드시 'missing'으로 표기**하여 재질문을 유도하십시오.\n"
@@ -344,6 +349,7 @@ def compose_complaint(meta, collected: dict, evidence: List[str]):
         "- detail_item_or_service.goods_or_service 값이 present라면 브랜드/모델/서비스 명칭을 그대로 서술에 반영하고 '물품'과 같은 모호한 표현을 피하십시오.\n"
         "- 조문/항 번호는 검색 또는 예시에 포함된 경우에만 사용하십시오(임의 생성 금지).\n"
         "- 불명확/누락 정보는 본문에 표기하지 않으며, 상황을 임의로 파악하여 기재하지 않습니다.\n"
+        + PII_NOTE +
         "- 사건 데이터(JSON)에 있는 사실만 쓰십시오. 다음은 데이터에 그대로 있을 때만 씁니다: 고소인의 감정과 피해의 정도, "
         "누가 요구·안내·거부·지시했는지, 계좌나 앱이 누구의 것인지, 횟수와 반복 여부, 반환이나 환불을 요청했는지와 그 결과.\n"
         "- 돈을 받은 사람이나 계좌 주인이 피고소인이라고 데이터에 나와 있지 않으면 '피고소인의 계좌', '피고소인이 안내한 계좌', '피고소인에게 송금'이라고 쓰지 마십시오.\n"

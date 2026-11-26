@@ -8,7 +8,7 @@ from __future__ import annotations
 from cfg import settings
 from schemas.verification import Verification
 from services.openai_client import respond, respond_parsed
-from services.pipelines import postprocess_complaint, split_complaint_sections
+from services.pipelines import PII_NOTE, postprocess_complaint, split_complaint_sections
 
 SECTION_TITLES = {"criminal_facts": "범죄사실", "accusation_reason": "고소이유"}
 
@@ -30,6 +30,7 @@ VERIFY_RULES = (
     "quote에는 초안의 해당 표현을 한 글자도 바꾸지 말고 그대로 옮기십시오. 문장 전체가 아니라 근거 없는 부분만 옮겨도 됩니다.\n"
     "reason에는 대화의 어느 부분과 맞지 않는지 한 문장으로 적으십시오.\n"
     "근거 없는 서술이 없으면 unsupported를 빈 목록으로 두십시오.\n"
+    + PII_NOTE
 )
 
 REWRITE_SYSTEM = (
@@ -45,6 +46,7 @@ REWRITE_RULES = (
     "- 지적되지 않은 문장은 그대로 두십시오.\n"
     "- 처벌을 바란다는 문장과 수사를 요청하는 문장은 지우지 마십시오. 그 문장에 근거 없는 표현이 섞여 있으면 그 표현만 빼십시오.\n"
     "- 출력은 [초안]과 같은 형식으로 하십시오: '=== 범죄사실 ===' 과 '=== 고소이유 ===' 두 부분.\n"
+    + PII_NOTE
 )
 
 

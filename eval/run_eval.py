@@ -175,7 +175,10 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
            "expected_offense": case["expected_offense"], "errors": [], "turns": []}
     t0 = time.time()
 
-    st, init, lat = http("POST", f"{ai}/chat/init", {"text": case["narrative"], "offense": case["offense_selected"]})
+    # 서버가 입력 화면에서 받은 이름과 주소를 넘겨주는 것을 흉내 낸다 (S05 치환). 전화·계좌는 서비스가 정규식으로 찾는다.
+    known = {k: (case.get("pii") or {}).get(k) or [] for k in ("names", "addresses")}
+    st, init, lat = http("POST", f"{ai}/chat/init",
+                         {"text": case["narrative"], "offense": case["offense_selected"], "known_pii": known})
     out["init"] = {"status": st, "latency_s": round(lat, 3), "offense": (init or {}).get("offense")}
     if st != 200 or not init or "session_id" not in init:
         out["errors"].append(f"init 실패: {st} {init}")
