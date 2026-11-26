@@ -21,6 +21,7 @@ import {
   type CrimeCategory,
   type CrimeSubcategory,
   type SavedOffenseSelection,
+  isSupportedOffense,
   loadSelectedOffense,
   saveSelectedOffense,
 } from '@/features/complaint/constants/criminalCrimes';
@@ -646,16 +647,31 @@ const ChatWindowSection: React.FC<Props> = ({
 
           {selectStep === 'subcategory' && selectedCategory && (
             <div className="flex flex-wrap gap-2">
-              {selectedCategory.children.map((offense) => (
-                <button
-                  key={offense.id}
-                  type="button"
-                  onClick={() => handleSelectSubcategory(offense)}
-                  className="text-body-3-regular hover:border-primary-400 hover:bg-primary-50 hover:text-primary-500 rounded-full border border-neutral-300 bg-neutral-50 px-4 py-2 text-neutral-700 transition-colors active:scale-95"
-                >
-                  {offense.name}
-                </button>
-              ))}
+              {selectedCategory.children.map((offense) =>
+                isSupportedOffense(offense) ? (
+                  <button
+                    key={offense.id}
+                    type="button"
+                    onClick={() => handleSelectSubcategory(offense)}
+                    className="text-body-3-regular hover:border-primary-400 hover:bg-primary-50 hover:text-primary-500 rounded-full border border-neutral-300 bg-neutral-50 px-4 py-2 text-neutral-700 transition-colors active:scale-95"
+                  >
+                    {offense.name}
+                  </button>
+                ) : (
+                  <button
+                    key={offense.id}
+                    type="button"
+                    disabled
+                    title="아직 지원하지 않는 유형이에요"
+                    className="text-body-3-regular flex cursor-not-allowed items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-4 py-2 text-neutral-400"
+                  >
+                    {offense.name}
+                    <span className="text-detail-regular rounded-full bg-neutral-200 px-2 py-0.5 text-neutral-500">
+                      준비 중
+                    </span>
+                  </button>
+                ),
+              )}
               <button
                 type="button"
                 onClick={handleRetrySelection}

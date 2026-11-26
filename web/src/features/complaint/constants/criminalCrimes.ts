@@ -19,6 +19,16 @@ export const CRIMINAL_CATEGORIES: CrimeCategory[] =
 export type { CrimeCategory, CrimeSubcategory };
 
 /**
+ * 지금 고소장 초안을 작성할 수 있는 죄목. 나머지는 설명만 보여 주고 "준비 중"으로 막는다.
+ * 지원하지 않는 죄목을 고르면 다른 죄목의 양식으로 질문하고 초안을 쓰게 되기 때문이다.
+ */
+const SUPPORTED_OFFENSE_IDS = new Set(['fraud', 'cyber_fraud']);
+
+export function isSupportedOffense(offense: CrimeSubcategory): boolean {
+  return SUPPORTED_OFFENSE_IDS.has(offense.id);
+}
+
+/**
  * 사용자가 고른 죄목을 complaintId 단위로 보관/복원한다.
  *
  * 죄목 선택은 AI 세션이 생성되기 "전"에 일어나므로 백엔드 채팅 히스토리에 남지 않는다.
