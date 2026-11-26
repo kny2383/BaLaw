@@ -236,6 +236,55 @@ def test_generate_works_without_verification_field(client, db_session, user_toke
     assert r.status_code == 200 and r.json()["verification"] is None
 
 
+# ---------- 실패 응답에 내부 오류 원문을 넣지 않는다 ----------
+SECRET = "http://ai:8000 내부주소 Traceback"
+
+
+def test_generate_failure_hides_the_internal_error(client, db_session, user_tokens, monkeypatch):
+    from app.api import complaint as complaint_api
+
+    async def failing_compose(session_id):
+        raise RuntimeError(f"Baro-AI 서버 오류 (502): {SECRET}")
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_compose", failing_compose)
+    cid = create_complaint(client, user_tokens)
+    _with_session(db_session, cid)
+    r = client.post(f"/api/complaints/{cid}/generate", headers=auth_header(user_tokens))
+    assert r.status_code == 503
+    assert "내부주소" not in r.text and "Traceback" not in r.text and r.json()["detail"]
+    assert _complaint(db_session, cid).status != "completed"
+
+
+def test_chat_init_failure_hides_the_internal_error(client, user_tokens, monkeypatch):
+    from app.api import complaint as complaint_api
+
+    async def failing_init(*args, **kwargs):
+        raise RuntimeError(SECRET)
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", failing_init)
+    cid = create_complaint(client, user_tokens)
+    r = client.post(f"/api/complaints/{cid}/chat/init", json={"text": "사건 개요", "offense": "사기"},
+                    headers=auth_header(user_tokens))
+    assert r.status_code == 503 and "내부주소" not in r.text
+
+
+def test_empty_draft_is_not_saved_as_a_finished_complaint(client, db_session, user_tokens, monkeypatch):
+    """AI 서비스가 본문이 빈 초안을 돌려줘도 완성된 고소장으로 저장하지 않는다 (M10)."""
+    from app.api import complaint as complaint_api
+
+    cid = create_complaint(client, user_tokens)
+    _with_session(db_session, cid)
+    for sections in ({"criminal_facts": " ", "accusation_reason": ""}, {"criminal_facts": None}, None):
+        async def empty_compose(session_id, sections=sections):
+            return {"offense": "fraud", "title": "사기", "sections": sections}
+
+        monkeypatch.setattr(complaint_api.ai_service, "chat_compose", empty_compose)
+        r = client.post(f"/api/complaints/{cid}/generate", headers=auth_header(user_tokens))
+        assert r.status_code == 503, sections
+    saved = _complaint(db_session, cid)
+    assert saved.status != "completed" and not saved.generated_complaint_encrypted
+
+
 # ---------- 고소장 생성: 사용자 확인 ----------
 WAITING = {"status": "awaiting_confirmation", "rewrites": 0, "rechecked": False, "removed": [], "confirmed": [],
            "unsupported": [{"quote": "극심한 고통", "reason": "대화에 없는 내용"}],
