@@ -17,6 +17,11 @@ class BaroAIService:
         error_msg = str(error)
         return "세션을 찾을 수 없습니다" in error_msg or "404" in error_msg
 
+    @staticmethod
+    def is_no_pending_confirmation_error(error: Exception) -> bool:
+        """확인을 기다리는 초안이 없다는 응답(409)인가."""
+        return "(409)" in str(error)
+
     async def chat_init(self, text: str, offense: Optional[str] = None,
                         known_pii: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
@@ -214,15 +219,20 @@ class BaroAIService:
                 "sections": {
                     "criminal_facts": str,  # 범죄사실
                     "accusation_reason": str  # 고소이유
-                }
+                },
+                "verification": {"status": str, ...}  # awaiting_confirmation이면 to_confirm에 물을 표현이 있다
             }
         """
+        return await self._post_compose("/chat/compose", {"session_id": session_id})
+
+    async def chat_compose_confirm(self, session_id: str, answers: List[bool]) -> Dict[str, Any]:
+        """확인을 기다리며 멈춘 작성을 사용자의 답으로 이어 간다. 응답 형식은 chat_compose와 같다."""
+        return await self._post_compose("/chat/compose/confirm", {"session_id": session_id, "answers": answers})
+
+    async def _post_compose(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/compose",
-                    json={"session_id": session_id}
-                )
+                response = await client.post(f"{self.base_url}{path}", json=payload)
                 response.raise_for_status()
                 return response.json()
         except httpx.HTTPStatusError as e:
