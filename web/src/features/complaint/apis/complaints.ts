@@ -149,6 +149,12 @@ type GenerateResponse = {
 
 // 위자드에서 쓰기 편하게 가공해서 리턴
 function toGenerateResult(data: GenerateResponse) {
+  const toConfirm =
+    data.status === 'awaiting_confirmation' ? (data.verification?.to_confirm ?? []) : [];
+  // 확인을 기다린다는데 물을 표현이 없으면 완성된 것으로 넘기지 않는다 (서버에 저장된 초안이 없다)
+  if (data.status !== 'completed' && toConfirm.length === 0) {
+    throw new Error(`고소장이 완성되지 않았습니다: ${data.status}`);
+  }
   return {
     complaint_id: data.complaint_id,
     status: data.status,
@@ -156,8 +162,7 @@ function toGenerateResult(data: GenerateResponse) {
     accusation_reason: data.accusation_reason,
     generated_complaint: `[범죄 사실]\n${data.criminal_facts}\n\n[고소 이유]\n${data.accusation_reason}`,
     // 사용자에게 확인받을 표현. 비어 있으면 완성된 것이다.
-    to_confirm:
-      data.status === 'awaiting_confirmation' ? (data.verification?.to_confirm ?? []) : [],
+    to_confirm: toConfirm,
   };
 }
 
