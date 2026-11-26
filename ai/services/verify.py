@@ -80,7 +80,8 @@ def verify_draft(history: list[dict], sections: dict) -> list[dict]:
     # 초안에 없는 인용은 고칠 대상을 가리키지 못하므로 버린다.
     found = []
     for c in out.unsupported:
-        quote = c.quote.strip()
+        # 글머리표는 문장의 일부가 아니다. 떼어 내야 문장 안에서 구절의 자리를 찾을 수 있다.
+        quote = c.quote.strip().lstrip("○").strip()
         if quote and quote in draft_text:
             found.append({"quote": quote, "reason": c.reason, "sentence": sentence_of(quote, draft_text)})
     dropped = len(out.unsupported) - len(found)

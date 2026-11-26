@@ -358,3 +358,9 @@ def test_whole_sentence_quote_is_not_repeated(fake, monkeypatch):
     prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
     assert f'- "{SENTENCE}" (' in prompt and "— 문장:" not in prompt
     assert out["review"]["removed"][0]["sentence"] == SENTENCE
+
+
+def test_bullet_mark_is_not_part_of_the_quote(fake, monkeypatch):
+    fake.verify_results = [["○ " + SENTENCE]]
+    out = _compose(fake, monkeypatch)
+    assert out["review"]["removed"] == [{"quote": SENTENCE, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
