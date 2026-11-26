@@ -57,7 +57,18 @@ def main() -> int:
     out_dir = ROOT / "runs" / args.run_id / "cases"
     out_dir.mkdir(parents=True, exist_ok=True)
     proxy_control({"run_id": args.run_id, "case_id": ""})
+    failed: list[str] = []
+    try:
+        run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify)
+    finally:
+        proxy_control({"run_id": "", "case_id": ""})  # 중간에 멈춰도 다음 호출이 이 실행 이름으로 기록되지 않게 한다
+    if failed:
+        print(f"검증하지 못했거나 다시 쓰지 못한 사례 {len(failed)}건: {', '.join(failed)}", flush=True)
+        return 1
+    return 0
 
+
+def run(args, src_dir, out_dir, failed, verify, rewrite, route_after_verify) -> None:
     for f in sorted(src_dir.glob("*.json")):
         r = json.loads(f.read_text(encoding="utf-8"))
         if args.only and r["id"] not in args.only:
@@ -86,8 +97,8 @@ def main() -> int:
         rv = state["review"]
         print(f"{r['id']}: {rv['status']} 찾음 {len(rv['removed']) + len(rv['unsupported'])} "
               f"({r['verify_rewrite_s']}초)", flush=True)
-    proxy_control({"run_id": "", "case_id": ""})
-    return 0
+        if rv["status"] in ("unverified", "rewrite_failed"):
+            failed.append(r["id"])
 
 
 if __name__ == "__main__":
