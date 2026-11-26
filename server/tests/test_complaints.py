@@ -211,7 +211,7 @@ def test_known_pii_skips_placeholder_names(client, db_session, user_tokens):
 
     cid = create_complaint(client, user_tokens)
     complaint = db_session.get(Complaint, cid)
-    complaint.accused_name = encryption_service.encrypt_field("성명불상")
+    complaint.accused_name = encryption_service.encrypt_field("성명 불상(추정)")
     complaint.accused_address = encryption_service.encrypt_field("부산광역시 가상구 가상로 9")
     db_session.commit()
     known = known_pii_of(db_session.get(Complaint, cid))

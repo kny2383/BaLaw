@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import not_
@@ -141,7 +142,13 @@ def get_restore_history(db: Session, complaint_id: int, exclude_message_id: Opti
 
 
 # 이름 칸에 값 대신 적는 말. 이런 값을 넘기면 서술의 같은 낱말이 모두 표식으로 바뀐다.
-_NOT_A_NAME = {"모름", "불상", "미상", "성명불상", "성명미상", "알수없음", "알 수 없음", "없음"}
+_NOT_A_NAME = ("모름", "모르", "불상", "미상", "성명불상", "성명미상", "알수없", "없음")
+
+
+def _is_placeholder(value: str) -> bool:
+    """'성명 불상', '모름.', '성명불상(추정)'처럼 띄어쓰기나 기호가 달라도 걸러낸다."""
+    key = re.sub(r"[\s().,·]", "", value)
+    return key.startswith(_NOT_A_NAME)
 
 
 def known_pii_of(complaint: Complaint) -> dict:
@@ -150,7 +157,7 @@ def known_pii_of(complaint: Complaint) -> dict:
         out = []
         for field in fields:
             value = (encryption_service.decrypt_field(field) or "").strip() if field else ""
-            if len(value) >= 2 and value not in _NOT_A_NAME and value not in out:
+            if len(value) >= 2 and not _is_placeholder(value) and value not in out:
                 out.append(value)
         return out
 
