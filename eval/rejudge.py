@@ -6,7 +6,7 @@
   python3 eval/rejudge.py --from baseline-1 --run-id baseline-1-judge-v2
   python3 eval/rejudge.py --from baseline-1 --run-id try-v2 --only insult-02 insult-04
 
-같은 --run-id로 다시 실행하면 판정에 성공한 사례는 건너뛰고 실패한 사례만 다시 판정한다.
+같은 --run-id와 같은 판정 모델로 다시 실행하면 판정에 성공한 사례는 건너뛰고 실패한 사례만 다시 판정한다.
 
 결과: eval/runs/<run-id>/ (사례별 기록, git 제외), eval/results/<run-id>.md (요약, 커밋).
 """
@@ -70,17 +70,21 @@ def main() -> int:
     results = []
 
     def one(src: dict) -> dict:
-        # 같은 실행 이름으로 이미 판정에 성공한 사례는 다시 부르지 않는다 (실패한 사례만 다시)
+        # 같은 실행 이름·판정 판본·판정 모델로 이미 성공한 사례는 다시 부르지 않는다 (실패한 사례만 다시)
         done = out_dir / f"{src['id']}.json"
         if done.exists():
             prev = json.loads(done.read_text(encoding="utf-8"))
-            if prev.get("judge", {}).get("version") == ev.JUDGE_VERSION:
+            j = prev.get("judge", {})
+            if (j.get("version"), j.get("provider"), j.get("model")) == (ev.JUDGE_VERSION, cfg["provider"], cfg["model"]):
                 return prev
         r = copy.deepcopy(src)
         r.pop("judge", None)
         r["errors"] = [e for e in r.get("errors", []) if not e.startswith("판정 실패")]
         r["rejudged_from"] = args.src
-        ev.judge_case(r, cfg)
+        try:
+            ev.judge_case(r, cfg)
+        except Exception as e:  # 판정 외 예외도 사례 결과에 남기고 나머지를 계속한다
+            r["errors"].append(f"판정 실패: 평가기 예외 {e!r}")
         return r
 
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
