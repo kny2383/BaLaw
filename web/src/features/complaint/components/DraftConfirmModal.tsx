@@ -13,6 +13,24 @@ type DraftConfirmModalProps = {
   onClose: () => void;
 };
 
+/** 문장 안에서 확인이 필요한 구절만 강조한다. 문장이 없거나 구절을 찾지 못하면 구절 전체를 강조한다. */
+function renderClaim(claim: DraftClaim) {
+  const sentence = claim.sentence ?? claim.quote;
+  const at = sentence.indexOf(claim.quote);
+  if (at < 0) {
+    return <mark className="bg-primary-0 text-body-3-bold rounded px-0.5">{claim.quote}</mark>;
+  }
+  return (
+    <>
+      {sentence.slice(0, at)}
+      <mark className="bg-primary-0 text-body-3-bold rounded px-0.5 text-neutral-900">
+        {claim.quote}
+      </mark>
+      {sentence.slice(at + claim.quote.length)}
+    </>
+  );
+}
+
 /**
  * 초안에서 대화로 확인되지 않은 표현을 사용자에게 묻는다.
  * 사실이 맞다고 답한 표현은 초안에 남고, 아니라고 답한 표현은 고쳐 쓴다.
@@ -48,9 +66,9 @@ const DraftConfirmModal: React.FC<DraftConfirmModalProps> = ({
             초안의 내용이 맞는지 확인해 주세요
           </h2>
           <p className="text-body-3-regular mt-2 text-neutral-500">
-            아래 표현은 대화에서 말씀하신 내용으로 확인되지 않았어요. 실제로 겪은 일이 맞으면
-            &lsquo;맞아요&rsquo;를, 아니면 &lsquo;아니에요&rsquo;를 골라 주세요. 아니라고 답한
-            표현은 초안에서 고쳐 써요.
+            색으로 표시한 부분은 대화에서 말씀하신 내용으로 확인되지 않았어요. 실제로 겪은 일이
+            맞으면 &lsquo;맞아요&rsquo;를, 아니면 &lsquo;아니에요&rsquo;를 골라 주세요. 아니라고
+            답한 표현은 초안에서 고쳐 써요.
           </p>
         </div>
 
@@ -60,8 +78,8 @@ const DraftConfirmModal: React.FC<DraftConfirmModalProps> = ({
               key={index}
               className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4"
             >
-              <p className="text-body-3-bold leading-relaxed text-neutral-800">
-                &ldquo;{claim.quote}&rdquo;
+              <p className="text-body-3-regular leading-relaxed text-neutral-800">
+                {renderClaim(claim)}
               </p>
               {claim.reason && (
                 <p className="text-detail-regular mt-2 leading-relaxed text-neutral-500">

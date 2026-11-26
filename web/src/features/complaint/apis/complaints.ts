@@ -136,7 +136,8 @@ export async function sendChat(complaintId: number, aiSessionId: string, message
 }
 
 /** 초안에서 대화로 확인되지 않은 표현 */
-export type DraftClaim = { quote: string; reason?: string };
+// quote는 근거가 확인되지 않은 구절, sentence는 그 구절이 들어 있는 초안의 문장이다
+export type DraftClaim = { quote: string; reason?: string; sentence?: string };
 
 type GenerateResponse = {
   complaint_id: number;
