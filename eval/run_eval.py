@@ -305,9 +305,13 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
     st, comp, lat = http("POST", f"{ai}/chat/compose", {"session_id": sid})
     out["compose"] = {"status": st, "latency_s": round(lat, 3), "body": comp}
     # 서비스가 사용자 확인을 기다리면 모의 사용자가 답하고 이어 간다.
+    def waiting() -> dict | None:
+        review = comp.get("verification") if st == 200 and isinstance(comp, dict) else None
+        return review if isinstance(review, dict) and review.get("status") == "awaiting_confirmation" else None
+
     for _ in range(CONFIRM_MAX_ROUNDS):
-        review = (comp or {}).get("verification") if st == 200 and isinstance(comp, dict) else None
-        if not isinstance(review, dict) or review.get("status") != "awaiting_confirmation":
+        review = waiting()
+        if not review:
             break
         try:
             shown = "\n\n".join(v for v in (comp.get("sections") or {}).values() if isinstance(v, str))
@@ -318,8 +322,8 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
         out.setdefault("confirm", []).append(rnd)
         st, comp, lat = http("POST", f"{ai}/chat/compose/confirm", {"session_id": sid, "answers": rnd["answers"]})
         out["compose"] = {"status": st, "latency_s": round(out["compose"]["latency_s"] + lat, 3), "body": comp}
-    else:
-        out["errors"].append(f"확인이 {CONFIRM_MAX_ROUNDS}차례 안에 끝나지 않았다")
+    if waiting():
+        out["errors"].append("확인을 끝내지 못했다: 초안은 고치지 않은 상태다")
     draft = ""
     if st == 200 and isinstance(comp, dict):
         sections = comp.get("sections") if isinstance(comp.get("sections"), dict) else {}
