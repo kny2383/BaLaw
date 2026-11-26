@@ -12,6 +12,7 @@
 | `run_eval.py` | 평가기. 사례를 모의 사용자로 진행하고 지표를 계산 (경로 A) | 완료 |
 | `rejudge.py` | 저장된 실행 기록으로 판정(M1, M8)만 다시 한다. 판정 기준을 바꾼 뒤 같은 초안에 적용할 때 쓴다 | 완료 |
 | `judge.py` | 판정 모델 호출 계층. 공급자를 바꿀 수 있게 분리 (결정 0002) | OpenAI만 구현 |
+| `subsets/dev10.txt` | 부분 측정용 개발 세트 10건 목록 | 완료 |
 | `prices.json` | 모델 판본별 단가와 기준 날짜 | 완료 |
 | `check_cases.py` | 사례 형식·정답 잠금 검사 (CI에서도 실행) | 완료 |
 | `results/` | 실행별 요약 (커밋) | - |
@@ -76,6 +77,18 @@ python3 eval/rejudge.py --from baseline-1 --run-id baseline-1-judge-v2
 ```
 
 같은 `--run-id`로 다시 실행하면 판정에 성공한 사례는 건너뛰고 실패한 사례만 다시 판정한다.
+
+부분 세트로 재기 (개선 하나의 효과를 싸게 확인할 때):
+
+```bash
+python3 eval/run_eval.py --run-id try-1 --only $(grep -v '^#' eval/subsets/dev10.txt)
+```
+
+정보 추출 호출의 추론 강도를 바꿔 비교하기. 값은 `minimal`, `low`, `medium`, `high`이고 비우면 모델 기본값이다. 실제로 실린 값은 결과의 `extract_reasoning_effort`에 나온다.
+
+```bash
+EVAL_EXTRACT_REASONING_EFFORT=low docker compose -f compose.yaml -f compose.eval.yaml up -d --build ai
+```
 
 ## 알려진 한계
 

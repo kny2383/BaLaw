@@ -1,0 +1,13 @@
+# 부분 측정용 개발 세트 10건. 대화를 진행하는 9개 묶음에서 1건씩, 나머지에서 1건을 뽑았다 (난수 시드 20261126).
+# 전체 세트(38건) 대신 개선 하나의 효과를 싸게 확인할 때 쓴다. 결과 문서에는 "부분 세트 dev10"이라고 적는다.
+# 이 목록을 바꾸면 이전 부분 측정과 비교할 수 없다.
+fraud-jeonse-04
+fraud-job-scam-04
+fraud-leading-room-01
+fraud-used-goods-03
+fraud-voice-phishing-03
+insult-01
+pii-02
+sparse-03
+sparse-05
+vague-02

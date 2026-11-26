@@ -123,7 +123,8 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
 def extract_all(user_text: str, offense: str) -> Dict[str, Dict[str, dict]]:
     meta = get_offense_meta(offense)
     prompt = _build_single_prompt(user_text, meta, offense)
-    out = respond(settings.OPENAI_CHAT_MODEL, NEUTRAL_SYSTEM, prompt)
+    out = respond(settings.OPENAI_CHAT_MODEL, NEUTRAL_SYSTEM, prompt,
+                  reasoning_effort=settings.OPENAI_EXTRACT_REASONING_EFFORT)
     try:
         parsed = json.loads(out)
     except Exception:

@@ -435,6 +435,9 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
                             "p95_s": p95(v["latency"]),
                             "out_tokens": v["out"], "reasoning_tokens": v["reasoning"], "cost_usd": round(v["cost"], 4)}
                         for k, v in sorted(kinds.items())}
+    # 정보 추출 요청에 실제로 실린 추론 강도. 설정이 아니라 기록된 요청에서 읽는다.
+    s["extract_reasoning_effort"] = sorted({(r.get("request") or {}).get("reasoning_effort") or "default"
+                                            for r in calls if call_kind(r) == "extract"})
     s["M11_service_cost_usd"] = round(sum(v["cost_usd"] for v in s["M11_by_kind"].values()), 4)
     send_lat = [t["latency_s"] for r in convo for t in r["turns"] if "latency_s" in t]
     s["M11_turn_latency_p50_s"] = round(statistics.median(send_lat), 1) if send_lat else None

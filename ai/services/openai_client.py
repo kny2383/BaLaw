@@ -38,8 +38,10 @@ def _extract_output_text(resp) -> str:
 
     return ""
 
-def respond(model: str, system: str, user: str) -> str:
+def respond(model: str, system: str, user: str, reasoning_effort: Optional[str] = None) -> str:
     c = client()
+    # 추론 강도를 지정하지 않으면 요청에 넣지 않는다 (모델 기본값).
+    options = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
 
     try:
         resp = c.chat.completions.create(
@@ -48,6 +50,7 @@ def respond(model: str, system: str, user: str) -> str:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            **options,
         )
         return _extract_output_text(resp).strip()
     except Exception as e:
