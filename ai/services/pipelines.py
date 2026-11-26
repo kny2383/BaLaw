@@ -380,8 +380,9 @@ def compose_complaint(meta, collected: dict, evidence: List[str]):
     out = respond(settings.OPENAI_COMPOSE_MODEL, COMPOSE_SYSTEM, user)
     draft = postprocess_complaint(out)
     sections = split_complaint_sections(draft)
-    if not any(v.strip() for v in sections.values()):
-        raise LLMCallError("no_sections")
+    # 범죄사실이 없는 초안은 쓸 수 없다. 구분 제목이 없는 출력은 위에서 전체가 범죄사실로 들어간다.
+    if not sections.get("criminal_facts", "").strip():
+        raise LLMCallError("no_criminal_facts")
     return {
         "offense": meta.offense,
         "title": meta.title_ko,

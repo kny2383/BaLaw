@@ -259,7 +259,7 @@ def test_confirm_question_restores_identifiers(client, fake, confirm_on):
     assert [c["quote"] for c in body["verification"]["to_confirm"]] == ["김가상에게"]
 
 
-@pytest.mark.parametrize("broken", ["call_fails", "empty_output", "no_text_at_all"])
+@pytest.mark.parametrize("broken", ["call_fails", "empty_output", "no_text_at_all", "no_criminal_facts"])
 def test_compose_failure_is_an_error_not_an_empty_draft(client, fake, broken):
     """작성 호출이 실패하거나 쓸 수 있는 글이 없으면 빈 초안을 200으로 돌려주지 않는다 (M10)."""
     sid = _init(client)["session_id"]
@@ -267,7 +267,8 @@ def test_compose_failure_is_an_error_not_an_empty_draft(client, fake, broken):
     if broken == "call_fails":
         fake.fail_compose = True
     else:
-        fake.compose_text = "" if broken == "empty_output" else "   \n  "
+        fake.compose_text = {"empty_output": "", "no_text_at_all": "   \n  ",
+                             "no_criminal_facts": "=== 고소이유 ===\n○ 수사를 요청합니다.\n"}[broken]
     r = client.post("/chat/compose", json={"session_id": sid})
     assert r.status_code == 502
     assert "fake failure" not in r.text
