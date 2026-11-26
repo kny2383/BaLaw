@@ -7,6 +7,7 @@
 
 - 작업별 모델: `LLM_MODEL_<작업>` (예: LLM_MODEL_EXTRACT). 없으면 이전과 같은 기본값이다.
 - 작업별 주소: `LLM_BASE_URL_<작업>`. OpenAI 호환 API를 내는 다른 서버(로컬 모델 등)로 보낼 때 쓴다.
+  이때 OpenAI 키는 보내지 않는다. 그 서버의 키가 있으면 `LLM_API_KEY_<작업>`으로 준다.
 - 모든 호출은 같은 형식으로 기록한다: 작업, 모델, 토큰, 걸린 시간, 성공 여부. 내용은 기록하지 않는다.
 - 실패는 빈 값으로 바꾸지 않고 예외로 올린다 (지표 M10).
 
@@ -41,13 +42,22 @@ class StructuredOutputError(LLMCallError):
     """구조화 출력을 받지 못했다 (호출 오류, 모델의 거부, 잘리거나 스키마에 맞지 않는 출력)."""
 
 
-def _openai_model(name: str, base_url: Optional[str], reasoning_effort: Optional[str]):
-    if not settings.OPENAI_API_KEY:
+NO_KEY = "not-needed"  # 키가 필요 없는 서버에 보내는 자리 채움 값
+
+
+def _openai_model(name: str, base_url: Optional[str], reasoning_effort: Optional[str], api_key: Optional[str] = None):
+    # 작업별 주소를 지정했으면 OpenAI 키를 보내지 않는다. 그 서버의 키는 LLM_API_KEY_<작업>으로 따로 준다.
+    # 다른 서버에 OpenAI 키가 Authorization 헤더로 실려 가는 것을 막기 위해서다.
+    if base_url:
+        key = api_key or NO_KEY
+    else:
+        key = api_key or settings.OPENAI_API_KEY
+    if not key:
         raise RuntimeError("OPENAI_API_KEY가 설정되어 있지 않습니다. .env를 확인하세요.")
     # 추론 강도를 지정하지 않으면 요청에 넣지 않는다 (모델 기본값).
     options = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
     # 연결 오류, 시간 초과, 429, 5xx는 간격을 늘려 가며 다시 시도한다. 그래도 실패하면 예외가 올라온다.
-    return ChatOpenAI(model=name, api_key=settings.OPENAI_API_KEY, base_url=base_url or os.getenv("OPENAI_BASE_URL") or None,
+    return ChatOpenAI(model=name, api_key=key, base_url=base_url or os.getenv("OPENAI_BASE_URL") or None,
                       max_retries=settings.OPENAI_MAX_RETRIES, **options)
 
 
@@ -65,7 +75,8 @@ def spec(task: str) -> tuple[str, str]:
 def _model(task: str):
     if task not in _models:
         provider, name = spec(task)
-        _models[task] = _PROVIDERS[provider](name, settings.LLM_BASE_URLS.get(task), settings.LLM_REASONING_EFFORTS.get(task))
+        _models[task] = _PROVIDERS[provider](name, settings.LLM_BASE_URLS.get(task), settings.LLM_REASONING_EFFORTS.get(task),
+                                             settings.LLM_API_KEYS.get(task))
     return _models[task]
 
 
