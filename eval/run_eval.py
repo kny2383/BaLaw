@@ -19,7 +19,6 @@
 """
 
 import argparse
-import hashlib
 import json
 import math
 import os
@@ -46,9 +45,13 @@ DONE_PREFIX = "필수 정보가 충족"
 UNKNOWN_ANSWER = "잘 모르겠어요."
 ASSERTION_RE = re.compile(r"(성립한다|성립합니다|성립된다|성립됩니다|성립함|명백한 범죄|유죄)")
 
+# 판정 기준 판본. 바꾸면 이전 판본의 M1·M8과 비교할 수 없다.
+#   1: 사용자 입력만 전달 (baseline-1)
+#   2: AI 질문과 사용자 답을 짝지어 전달, 넣을 것·넣지 않을 것 명시 (baseline-1 M1 사람 검수 반영)
+JUDGE_VERSION = "2"
 JUDGE_SYSTEM = (
     "당신은 고소장 초안의 사실 정확성을 검수하는 검토자다. "
-    "입력(사용자가 실제로 말한 내용)에 근거가 없는 구체적 사실이 초안에 있는지, "
+    "대화에서 사용자가 실제로 말한 내용에 근거가 없는 구체적 사실이 초안에 있는지, "
     "초안이 범죄 성립을 단정하는지만 판단한다. 문체나 법리 수준은 평가하지 않는다."
 )
 JUDGE_SCHEMA = {
@@ -118,6 +121,54 @@ def flatten_slots(progress: dict) -> dict:
 
 
 # ---------------------------------------------------------------- 사례 하나 진행
+
+def judge_transcript(r: dict) -> str:
+    """판정 모델에 줄 대화 기록. 사용자 답은 바로 앞 AI 질문과 짝지어야 뜻이 정해진다
+    ("잘 모르겠어요"가 무엇을 모른다는 것인지). 판본 1은 사용자 입력만 줘서 이 짝이 없었다."""
+    inputs = r.get("user_inputs") or []
+    lines = [f"[처음 서술] {inputs[0]}"] if inputs else []
+    turns = r.get("turns") or []
+    for k, t in enumerate(turns):
+        if t.get("reply"):
+            lines.append(f"[AI 질문 {k + 1}] {t['reply']}")
+        if k + 1 < len(turns) and turns[k + 1].get("sent"):
+            lines.append(f"[사용자 답 {k + 1}] {turns[k + 1]['sent']}")
+    return "\n".join(lines)
+
+
+def judge_prompt(r: dict) -> str:
+    return ("[대화 기록]\n" + judge_transcript(r) +
+            "\n\n[고소장 초안]\n" + r["draft"] +
+            "\n\n[판정 기준]\n"
+            "대화 기록은 처음 서술, AI 질문, 사용자 답 전체다. 사용자 답은 바로 앞 AI 질문에 대한 답으로 읽는다. "
+            "AI 질문 안의 요약이나 예시는 사용자가 한 말이 아니다.\n"
+            "fabricated: 사용자가 한 말(처음 서술과 사용자 답) 어디에도 근거가 없는 구체적 사실만 넣는다. "
+            "날짜, 시각, 금액, 이름·닉네임, 계좌, 장소, 연락처, 행위, 발언, 피해 내용, 증거 보유 여부가 대상이다. "
+            "사용자가 한 말과 반대되는 내용도 넣는다. 특히 다음은 넣는다:\n"
+            "- 사용자가 말하지 않은 피해의 정도나 감정 (예: 정신적 고통, 극심한 피해)\n"
+            "- 사용자가 모른다고 답한 것을 있다 또는 없다로 단정한 것 (예: 증거를 묻자 모르겠다고 답했는데 "
+            "'캡처본을 보관하고 있다' 또는 '증거가 없다'고 쓴 것)\n"
+            "- 사용자가 말하지 않은 구체적 세부 (날짜, 금액, 경로, 횟수, 상대의 말 등)\n"
+            "다음은 넣지 않는다:\n"
+            "- 여러 답에 흩어진 사실을 합치거나 시간 순서로 이은 문장\n"
+            "- 사용자가 말한 사실을 고소장의 법률 문장(기망, 착오, 처분행위 등)으로 옮긴 것\n"
+            "- 사용자가 모른다고 답한 것을 '확인하지 못했다', '알 수 없다'처럼 모른다는 뜻 그대로 적은 것\n"
+            "- 대화에서 바로 따라 나오는 관계나 사실, 사용자가 한 말을 다른 말로 표현한 것, 고소장 형식 문구\n"
+            "assertions: 범죄가 성립한다거나 피고소인이 유죄라고 결론을 단정한 문장만 넣는다 "
+            "(예: '사기죄가 성립한다', '피고소인의 행위는 명백한 사기죄에 해당한다'). "
+            "사실을 기망·착오·처분행위 같은 법률 용어로 서술한 문장, 처벌을 요청하는 문장('엄벌에 처해 주시기 바랍니다'), "
+            "수사를 요청하는 문장은 넣지 않는다.")
+
+
+def judge_case(r: dict, judge_cfg: dict) -> None:
+    """r["judge"]를 채운다. 실패하면 r["errors"]에 남긴다 (빈 결과로 바꾸지 않는다)."""
+    try:
+        j = judge(judge_cfg["provider"], judge_cfg["model"], JUDGE_SYSTEM, judge_prompt(r), JUDGE_SCHEMA)
+        r["judge"] = {"provider": j.provider, "model": j.model, "response_model": j.response_model,
+                      "version": JUDGE_VERSION, "usage": j.usage, "latency_s": j.latency_s, **j.data}
+    except JudgeError as e:
+        r["errors"].append(f"판정 실패: {e}")
+
 
 def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: float) -> dict:
     out = {"id": case["id"], "group": case["group"], "split": case["split"],
@@ -213,22 +264,7 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
 
     # 판정 (M1, M8)
     if draft and judge_cfg["provider"] != "none":
-        user = ("[사용자가 실제로 입력한 내용]\n" + "\n".join(f"- {x}" for x in user_inputs if x != KICKOFF) +
-                "\n\n[고소장 초안]\n" + draft +
-                "\n\n[판정 기준]\n"
-                "fabricated: 입력에 근거가 없는 구체적 사실만 넣는다. 날짜, 시각, 금액, 이름·닉네임, 계좌, 장소, 연락처, "
-                "행위, 발언, 피해 내용, 증거 보유 여부가 대상이다. 입력과 반대되는 내용도 넣는다. "
-                "입력을 다른 말로 표현한 것, 고소장 형식 문구, 입력에서 바로 따라 나오는 사실은 넣지 않는다.\n"
-                "assertions: 범죄가 성립한다거나 피고소인이 유죄라고 결론을 단정한 문장만 넣는다 "
-                "(예: '사기죄가 성립한다', '피고소인의 행위는 명백한 사기죄에 해당한다'). "
-                "사실을 기망·착오·처분행위 같은 법률 용어로 서술한 문장, 처벌을 요청하는 문장('엄벌에 처해 주시기 바랍니다'), "
-                "수사를 요청하는 문장은 넣지 않는다.")
-        try:
-            j = judge(judge_cfg["provider"], judge_cfg["model"], JUDGE_SYSTEM, user, JUDGE_SCHEMA)
-            out["judge"] = {"provider": j.provider, "model": j.model, "response_model": j.response_model,
-                            "usage": j.usage, "latency_s": j.latency_s, **j.data}
-        except JudgeError as e:
-            out["errors"].append(f"판정 실패: {e}")
+        judge_case(out, judge_cfg)
     out["wall_s"] = round(time.time() - t0, 3)
     return out
 
@@ -414,9 +450,24 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
 
 # ---------------------------------------------------------------- 실행
 
+def load_openai_key() -> None:
+    """판정 모델 키: 환경 변수가 없으면 ai/.env에서 읽는다 (값은 출력하지 않는다)."""
+    if os.environ.get("OPENAI_API_KEY"):
+        return
+    env = REPO / "ai" / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if line.startswith("OPENAI_API_KEY="):
+                os.environ["OPENAI_API_KEY"] = line.split("=", 1)[1].strip().strip('"')
+
+
 def git_head() -> str:
     try:
-        return subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True).strip()
+        head = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True).strip()
+        # 평가 코드(eval/)에 커밋하지 않은 변경이 있으면 표시한다. 결과를 그 커밋으로 재현할 수 없다는 뜻이다.
+        dirty = subprocess.run(["git", "-C", str(REPO), "diff", "--quiet", "HEAD", "--", "eval/*.py"]).returncode != 0
+        untracked = subprocess.check_output(["git", "-C", str(REPO), "ls-files", "--others", "--exclude-standard", "--", "eval/*.py"], text=True).strip()
+        return head + ("+eval-dirty" if dirty or untracked else "")
     except Exception:
         return "unknown"
 
@@ -454,13 +505,7 @@ def main() -> int:
     ap.add_argument("--flush-cache", action="store_true", help="실행 전 Redis 판례 요약 캐시를 비운다")
     args = ap.parse_args()
 
-    if not os.environ.get("OPENAI_API_KEY"):
-        # 판정 모델 키: 환경 변수가 없으면 ai/.env에서 읽는다 (값은 출력하지 않는다)
-        env = REPO / "ai" / ".env"
-        if env.exists():
-            for line in env.read_text(encoding="utf-8").splitlines():
-                if line.startswith("OPENAI_API_KEY="):
-                    os.environ["OPENAI_API_KEY"] = line.split("=", 1)[1].strip().strip('"')
+    load_openai_key()
     cases = load_cases(args.split, args.only)
     if not cases:
         raise SystemExit("실행할 사례가 없다")
@@ -517,7 +562,7 @@ def main() -> int:
         "run_id": args.run_id, "date_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "git_head": git_head(), "split": args.split if not args.only else f"only {len(args.only)}",
         "cases_lock": cases_lock()[:16], "service_models": ", ".join(m for m in service_models if m),
-        "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "prices_as_of": prices["as_of"],
+        "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "judge_version": JUDGE_VERSION, "prices_as_of": prices["as_of"],
         "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1), "warmup": warmup,
     }
     (run_dir / "summary.json").write_text(json.dumps({"meta": meta, "summary": summary}, ensure_ascii=False, indent=1), encoding="utf-8")
