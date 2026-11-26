@@ -16,6 +16,7 @@ os.environ["OPENAI_API_KEY"] = "test-key"
 os.environ["OPENAI_BASE_URL"] = _fake.base_url
 os.environ["REDIS_URL"] = ""
 os.environ["OPENAI_EXTRACT_REASONING_EFFORT"] = "low"
+os.environ["DRAFT_MAX_REWRITES"] = "1"
 os.environ["PII_MASKING"] = "1"
 
 from fastapi.testclient import TestClient  # noqa: E402

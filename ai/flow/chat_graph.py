@@ -1,10 +1,12 @@
-"""대화 그래프: 추출 → 질문 선택, 그리고 작성.
+"""대화 그래프: 추출 → 질문 선택, 그리고 작성 → 검증 → 재작성.
 
 요청 하나가 그래프 실행 한 번이다. 상태는 체크포인터가 세션(thread)별로 이어 준다.
 
     요청 ─┬─ init ─────────────────────────▶ 끝
           ├─ message ─▶ extract ─▶ select_question ─▶ 끝
-          └─ compose ─▶ compose ───────────▶ 끝
+          └─ compose ─▶ compose ─▶ verify ─┬─ 근거 없는 표현 없음 ─▶ 끝
+                                  ▲        └─ 있음 ─▶ rewrite ─┬─ 횟수 남음 ─▶ verify
+                                  └────────────────────────────┘└─ 상한 ─▶ 끝
 """
 from __future__ import annotations
 
@@ -12,9 +14,11 @@ import copy
 
 from langgraph.graph import END, START, StateGraph
 
+from cfg import settings
 from flow.checkpoint import get_checkpointer
 from flow.state import ChatState
 from loaders.offense_loader import get_offense_meta
+from services.openai_client import StructuredOutputError
 from services.pipelines import (
     _user_window,
     classify_need_caution,
@@ -25,6 +29,7 @@ from services.pipelines import (
     pick_detail_followup,
     pick_element_followup,
 )
+from services.verify import rewrite_draft, verify_draft
 
 DONE_REPLY = "필수 정보가 충족되었습니다. 고소장을 작성해드릴게요."
 EXTRACT_WINDOW_CHARS = 1800
@@ -120,7 +125,57 @@ def compose(state: ChatState) -> dict:
     offense = _current_offense(state)
     meta = get_offense_meta(offense)
     draft = compose_complaint(meta=meta, collected=state.get("collected", {}), evidence=[])
-    return {"offense": offense, "draft": draft}
+    status = "pending" if settings.DRAFT_MAX_REWRITES > 0 else "off"
+    return {"offense": offense, "draft": draft,
+            "review": {"status": status, "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}}
+
+
+def verify(state: ChatState) -> dict:
+    """초안을 대화와 대조해 근거 없는 표현을 찾는다 (LLM 호출).
+
+    검증 호출이 실패하면 초안은 그대로 두고 '검증하지 못함'으로 남긴다. 검증된 것처럼 돌려주지 않는다.
+    """
+    review = dict(state["review"])
+    try:
+        found = verify_draft(state["history"], state["draft"]["sections"])
+    except StructuredOutputError as e:
+        print(f"[VERIFY] 초안 검증 실패 reason={e}")
+        return {"review": {**review, "status": "unverified"}}
+    if found:
+        return {"review": {**review, "status": "flagged", "rechecked": bool(review["rewrites"]), "unsupported": found}}
+    if review["rewrites"]:
+        return {"review": {**review, "status": "rewritten", "rechecked": True, "unsupported": []}}
+    return {"review": {**review, "status": "passed", "unsupported": []}}
+
+
+def rewrite(state: ChatState) -> dict:
+    """검증이 찾은 표현만 고쳐 다시 쓴다 (LLM 호출). 다시 쓰지 못하면 초안을 그대로 두고 그 사실을 남긴다."""
+    review = dict(state["review"])
+    sections = rewrite_draft(state["draft"]["sections"], review["unsupported"])
+    if sections is None:
+        print("[VERIFY] 재작성 실패: 쓸 수 있는 결과가 없음")
+        return {"review": {**review, "status": "rewrite_failed"}}
+    return {
+        "draft": {**state["draft"], "sections": sections},
+        # 고쳐 쓴 초안은 아직 다시 검증하지 않았다. 다시 검증하면 verify가 rechecked를 True로 바꾼다.
+        "review": {"status": "rewritten", "rewrites": review["rewrites"] + 1, "rechecked": False,
+                   "unsupported": [], "removed": review["removed"] + review["unsupported"]},
+    }
+
+
+def route_after_compose(state: ChatState) -> str:
+    return "verify" if state["review"]["status"] == "pending" else END
+
+
+def route_after_verify(state: ChatState) -> str:
+    review = state["review"]
+    return "rewrite" if review["status"] == "flagged" and review["rewrites"] < settings.DRAFT_MAX_REWRITES else END
+
+
+def route_after_rewrite(state: ChatState) -> str:
+    # 상한까지 고쳤으면 다시 검증하지 않고 끝낸다 (검증 호출을 한 번 아낀다).
+    review = state["review"]
+    return "verify" if review["status"] == "rewritten" and review["rewrites"] < settings.DRAFT_MAX_REWRITES else END
 
 
 def build_chat_graph(checkpointer=None):
@@ -133,5 +188,9 @@ def build_chat_graph(checkpointer=None):
     g.add_edge("init", END)
     g.add_edge("extract", "select_question")
     g.add_edge("select_question", END)
-    g.add_edge("compose", END)
+    g.add_node("verify", verify)
+    g.add_node("rewrite", rewrite)
+    g.add_conditional_edges("compose", route_after_compose, {"verify": "verify", END: END})
+    g.add_conditional_edges("verify", route_after_verify, {"rewrite": "rewrite", END: END})
+    g.add_conditional_edges("rewrite", route_after_rewrite, {"verify": "verify", END: END})
     return g.compile(checkpointer=checkpointer or get_checkpointer())

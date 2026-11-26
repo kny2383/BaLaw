@@ -212,3 +212,6 @@ class ComplaintGenerateResponse(BaseModel):
     criminal_facts: str  # 범죄사실
     accusation_reason: str  # 고소이유
     status: str
+    # 초안 검증 결과 (AI 서비스가 돌려준 그대로). status가 unverified, rewrite_failed, flagged이면
+    # 근거 없는 표현이 남아 있을 수 있다. 예전 AI 서비스 응답에는 없다.
+    verification: Optional[dict] = None

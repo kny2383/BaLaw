@@ -26,7 +26,8 @@ NARRATIVE = "표식서술 중고거래로 삼십만원을 보냈습니다"
 MESSAGE = "표식발화 오월 삼일입니다"
 # 저장소에서 찾으면 안 되는 글. 사용자가 쓴 글과 LLM이 만든 글(요약, 초안, 키워드, 판례)이 모두 들어 있다.
 PHONE = "010-9999-8888"  # 치환 상태(표식 → 원래 값)에 들어가는 값
-SECRETS = [NARRATIVE, MESSAGE, PHONE, "확인된 내용을 정리했습니다", "고소인은 피고소인에게", "표식키워드", "판례 요약 1", "2020고단1"]
+SECRETS = [NARRATIVE, MESSAGE, PHONE, "확인된 내용을 정리했습니다", "고소인은 피고소인에게", "표식키워드", "판례 요약 1", "2020고단1",
+           "대화에 없는 내용", "고소인은 금원을 송금"]  # 검증이 적은 이유, 고쳐 쓴 초안
 
 
 @pytest.fixture
@@ -61,6 +62,7 @@ def _run_conversation(saver, fake, monkeypatch):
     monkeypatch.setattr(rag, "search_similar_cases_filtered", lambda text, keyword, k=2: FakeCollection().query([text], 3)["metadatas"][0][:k])
     rag_graph.invoke({"request": {"text": NARRATIVE}}, checkpoint.rag_config(SID))
     out = chat.invoke({"request": {"action": "message", "message": MESSAGE}}, cfg)
+    fake.verify_results = [["피고소인에게"]]  # 검증 결과와 고쳐 쓴 초안도 저장되게 한다
     chat.invoke({"request": {"action": "compose"}}, cfg)
     return chat, out
 

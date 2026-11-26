@@ -321,8 +321,12 @@ def call_kind(r: dict) -> str:
     if r.get("path", "").endswith("/embeddings"):
         return "embedding"
     body = json.dumps(r.get("request") or {}, ensure_ascii=False)
+    if "[근거 없는 표현]" in body:
+        return "rewrite"
     if "[사건 요소(JSON)]" in body:
         return "compose"
+    if "근거가 없는 사실 서술" in body:
+        return "verify"
     if "법적 구성요건(elements)" in body:
         return "extract"
     roles = [m.get("role") for m in (r.get("request") or {}).get("messages") or []]
@@ -441,6 +445,12 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     # 정보 추출 요청에 실제로 실린 추론 강도. 설정이 아니라 기록된 요청에서 읽는다.
     s["extract_reasoning_effort"] = sorted({(r.get("request") or {}).get("reasoning_effort") or "default"
                                             for r in calls if call_kind(r) == "extract"})
+    # 초안 검증 결과 (passed | rewritten | flagged | unverified | rewrite_failed | off)
+    review = [((r.get("compose") or {}).get("body") or {}).get("verification") for r in results]
+    review = [v for v in review if isinstance(v, dict)]
+    s["verification_status"] = {k: sum(1 for v in review if v.get("status") == k)
+                                for k in sorted({v.get("status") for v in review})}
+    s["verification_removed_total"] = sum(len(v.get("removed") or []) for v in review)
     s["M11_service_cost_usd"] = round(sum(v["cost_usd"] for v in s["M11_by_kind"].values()), 4)
     send_lat = [t["latency_s"] for r in convo for t in r["turns"] if "latency_s" in t]
     s["M11_turn_latency_p50_s"] = round(statistics.median(send_lat), 1) if send_lat else None

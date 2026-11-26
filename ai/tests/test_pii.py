@@ -100,3 +100,19 @@ def test_masking_can_be_turned_off(client, fake, monkeypatch):
     monkeypatch.setattr(settings, "PII_MASKING", False)
     client.post("/chat/init", json={"text": NARRATIVE, "offense": "사기", "known_pii": KNOWN})
     assert PHONE in _sent_to_llm(fake) and "[전화번호1]" not in _sent_to_llm(fake)
+
+
+def test_verify_and_rewrite_requests_carry_tokens_and_quotes_are_restored(client, fake):
+    """초안 검증과 재작성 호출에도 표식만 나가고, 응답의 검증 결과에서는 원래 값으로 돌아온다."""
+    sid = client.post("/chat/init", json={"text": NARRATIVE, "offense": "사기", "known_pii": KNOWN}).json()["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": MESSAGE})
+    fake.compose_text = ("=== 범죄사실 ===\n○ 고소인은 [이름1]의 계좌 [계좌번호1]로 송금하였습니다.\n\n"
+                         "=== 고소이유 ===\n○ 수사를 요청합니다.\n")
+    fake.verify_results = [["[이름1]의 계좌 [계좌번호1]로"]]
+    fake.requests.clear()
+    body = client.post("/chat/compose", json={"session_id": sid}).json()
+    sent = _sent_to_llm(fake)
+    assert len(fake.requests) == 3  # 작성, 검증, 재작성
+    assert [v for v in RAW if v in sent] == []
+    assert body["verification"]["status"] == "rewritten"
+    assert body["verification"]["removed"][0]["quote"] == f"{NAME}의 계좌 {ACCOUNT}로"
