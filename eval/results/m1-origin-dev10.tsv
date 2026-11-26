@@ -1,0 +1,54 @@
+# extract-structured-dev10의 M1 항목이 어느 단계에서 생겼는지 분류 (2026-11-26, 분류자 1명, 1회).
+# 방법: 판정 모델(판정 기준 2판)이 잡은 항목을, 초안 작성 호출에 들어간 추출 결과(항목별 판정·요약·근거)와 대조했다.
+# origin: compose_fill = 작성 단계에서 새로 생김(요건·경위를 채우는 서술), compose_emotion = 작성 단계에서 새로 생김(감정·피해 정도),
+#         extract = 추출 요약이나 판정에 이미 있던 내용, absence = 요약의 "제공되지 않았다"를 초안이 "없다"로 단정
+case_id	item	origin
+fraud-jeonse-04	1	compose_fill
+fraud-jeonse-04	2	compose_emotion
+fraud-job-scam-04	1	extract
+fraud-job-scam-04	2	extract
+fraud-job-scam-04	3	compose_emotion
+fraud-leading-room-01	1	compose_fill
+fraud-leading-room-01	2	compose_fill
+fraud-leading-room-01	3	compose_fill
+fraud-leading-room-01	4	compose_fill
+fraud-leading-room-01	5	compose_fill
+fraud-leading-room-01	6	extract
+fraud-leading-room-01	7	absence
+fraud-leading-room-01	8	compose_emotion
+fraud-leading-room-01	9	compose_fill
+fraud-leading-room-01	10	compose_fill
+fraud-used-goods-03	1	compose_fill
+fraud-used-goods-03	2	compose_fill
+fraud-used-goods-03	3	compose_fill
+fraud-used-goods-03	4	absence
+fraud-used-goods-03	5	compose_emotion
+fraud-voice-phishing-03	1	extract
+fraud-voice-phishing-03	2	compose_fill
+insult-01	1	compose_fill
+insult-01	2	compose_emotion
+insult-01	3	absence
+insult-01	4	compose_emotion
+insult-01	5	compose_emotion
+pii-02	1	compose_fill
+pii-02	2	compose_fill
+pii-02	3	compose_fill
+pii-02	4	extract
+pii-02	5	compose_emotion
+pii-02	6	compose_emotion
+sparse-03	1	compose_fill
+sparse-03	2	compose_fill
+sparse-03	3	extract
+sparse-03	4	extract
+sparse-03	5	absence
+sparse-05	1	extract
+sparse-05	2	compose_emotion
+sparse-05	3	compose_fill
+sparse-05	4	compose_emotion
+sparse-05	5	compose_fill
+vague-02	1	compose_fill
+vague-02	2	compose_fill
+vague-02	3	compose_fill
+vague-02	4	extract
+vague-02	5	compose_fill
+vague-02	6	compose_emotion
