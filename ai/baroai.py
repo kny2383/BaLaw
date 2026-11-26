@@ -16,6 +16,7 @@ from services.pipelines import (
     _user_window,
     compose_complaint
 )
+from services.openai_client import StructuredOutputError
 from services.rag import run_rag_preview, map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
 
@@ -145,8 +146,13 @@ def _send_to_session(session_id: str, message: str) -> dict:
     s["history"].append({"role": "user", "content": message})
     user_text = _user_window(s["history"], max_chars=1800)
 
-    # LLM 호출
-    parsed = extract_all(user_text, offense)
+    # LLM 호출. 실패하면 이번 발화를 기록에서 빼고 오류로 알린다 (다시 보내면 같은 상태에서 이어진다).
+    try:
+        parsed = extract_all(user_text, offense)
+    except StructuredOutputError as e:
+        s["history"].pop()
+        print(f"[EXTRACT] 정보 추출 실패 session={session_id} reason={e}")
+        raise HTTPException(502, "답변을 처리하지 못했습니다. 잠시 후 다시 보내 주세요.")
     elements = enforce_elements(meta, parsed.get("elements", {}), user_text)
     details  = enforce_details(parsed.get("details", {}), offense)
 
@@ -239,8 +245,13 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(_load_rag_preview, sid, user_messages[0])
 
     last_response = None
-    for message in user_messages[1:]:
-        last_response = _send_to_session(sid, message)
+    try:
+        for message in user_messages[1:]:
+            last_response = _send_to_session(sid, message)
+    except HTTPException:
+        # 복원 중 실패하면 반쯤 만든 세션을 남기지 않는다. 클라이언트는 session_id를 받지 못한다.
+        SESSIONS.pop(sid, None)
+        raise
 
     return {
         "session_id": sid,

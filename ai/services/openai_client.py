@@ -1,5 +1,6 @@
 # services/openai_client.py
-from typing import Optional
+from typing import Optional, Type
+from pydantic import BaseModel
 from openai import OpenAI
 from cfg import settings
 
@@ -56,3 +57,39 @@ def respond(model: str, system: str, user: str, reasoning_effort: Optional[str] 
     except Exception as e:
         print(f"Error during OpenAI API call: {e}")
         return ""
+
+
+class StructuredOutputError(RuntimeError):
+    """구조화 출력을 받지 못했다 (호출 오류, 모델의 거부, 잘리거나 스키마에 맞지 않는 출력)."""
+
+
+def respond_parsed(model: str, system: str, user: str, schema: Type[BaseModel],
+                   reasoning_effort: Optional[str] = None) -> BaseModel:
+    """스키마에 맞는 구조화 출력을 받아 검증된 객체로 돌려준다.
+
+    실패하면 StructuredOutputError를 던진다. 빈 결과로 바꿔 돌려주지 않는다.
+    """
+    c = client()
+    options = {"reasoning_effort": reasoning_effort} if reasoning_effort else {}
+
+    try:
+        resp = c.chat.completions.parse(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            response_format=schema,
+            **options,
+        )
+    except Exception as e:
+        # 예외 본문에는 모델 출력(사용자 서술 인용)이 들어갈 수 있어 종류만 남긴다.
+        print(f"[LLM] 구조화 출력 호출 실패: {type(e).__name__}")
+        raise StructuredOutputError(f"{type(e).__name__}") from e
+
+    message = resp.choices[0].message
+    if message.parsed is None:
+        reason = "refusal" if getattr(message, "refusal", None) else "no_parsed_output"
+        print(f"[LLM] 구조화 출력 없음: {reason}")
+        raise StructuredOutputError(reason)
+    return message.parsed
