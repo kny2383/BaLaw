@@ -108,9 +108,7 @@ def select_question(state: ChatState) -> dict:
     return {
         "collected": collected,
         "history": history,
-        "reply": reply,
-        "complete": complete,
-        "caution": bool(caution_msg),
+        "result": {"reply": reply, "complete": complete, "caution": bool(caution_msg)},
     }
 
 

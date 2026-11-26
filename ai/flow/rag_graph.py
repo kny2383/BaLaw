@@ -14,19 +14,24 @@ PREVIEW_CASES = 2
 
 
 def predict_keyword(state: RagState) -> dict:
-    return {"keyword": rag.predict_crime_keyword(state["text"])}
+    return {"found": {"keyword": rag.predict_crime_keyword(state["request"]["text"])}}
 
 
 def search_cases(state: RagState) -> dict:
-    return {"raw_cases": rag.search_similar_cases_filtered(state["text"], state["keyword"], k=PREVIEW_CASES)}
+    found = state["found"]
+    raw = rag.search_similar_cases_filtered(state["request"]["text"], found["keyword"], k=PREVIEW_CASES)
+    return {"found": {**found, "raw_cases": raw}}
 
 
 def summarize_cases(state: RagState) -> dict:
-    return {
-        "cases": rag.summarize_cases_for_ui(state["text"], state["raw_cases"]),
-        "status": "ready",
-        "error": None,
-    }
+    found = state["found"]
+    cases = rag.summarize_cases_for_ui(state["request"]["text"], found["raw_cases"])
+    return {"result": {"status": "ready", "keyword": found["keyword"], "cases": cases, "error": None}}
+
+
+def failed_result(error: Exception) -> dict:
+    """어느 단계에서 실패했든 남기는 결과. 키워드와 판례는 비운다."""
+    return {"result": {"status": "failed", "keyword": None, "cases": [], "error": str(error)}}
 
 
 def build_rag_graph(checkpointer=None):

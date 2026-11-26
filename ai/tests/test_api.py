@@ -223,3 +223,17 @@ def test_restore_failure_leaves_no_session(client, fake, session_ids):
     history = [{"role": "user", "content": NARRATIVE}, {"role": "user", "content": "네"}]
     assert client.post("/chat/restore", json={"history": history}).status_code == 502
     assert session_ids() == []
+
+
+# ---------- DELETE /chat/{session_id} ----------
+def test_delete_session(client, session_ids):
+    sid = _init(client)["session_id"]
+    client.post("/chat/send", json={"session_id": sid, "message": KICKOFF})
+    assert client.delete(f"/chat/{sid}").status_code == 204
+    assert session_ids() == []
+    assert client.post("/chat/send", json={"session_id": sid, "message": KICKOFF}).status_code == 404
+    assert client.get(f"/chat/rag/{sid}").status_code == 404
+
+
+def test_delete_unknown_session_is_ok(client):
+    assert client.delete("/chat/none").status_code == 204

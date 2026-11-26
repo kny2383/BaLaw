@@ -1,5 +1,6 @@
 """대화 그래프의 노드와 상태 저장 테스트. LLM은 가짜 서버가 대신한다."""
 import copy
+import typing
 
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
@@ -47,16 +48,17 @@ def test_select_question_asks_one_missing_slot_without_touching_input():
     before = copy.deepcopy(state)
     out = select_question(state)
     assert state == before, "노드는 받은 상태를 고치지 않고 새 값을 돌려준다"
-    assert out["complete"] is False and out["reply"] != DONE_REPLY
+    result = out["result"]
+    assert result["complete"] is False and result["reply"] != DONE_REPLY
     assert _asked(out["collected"]) == 1
-    assert out["history"][-1] == {"role": "assistant", "content": out["reply"]}
+    assert out["history"][-1] == {"role": "assistant", "content": result["reply"]}
 
 
 def test_select_question_completes_when_everything_is_present():
     state = {"offense": "fraud", "collected": _collected("present"),
              "history": [{"role": "user", "content": "사건 개요"}]}
     out = select_question(state)
-    assert out["complete"] is True and out["reply"] == DONE_REPLY
+    assert out["result"]["complete"] is True and out["result"]["reply"] == DONE_REPLY
     assert _asked(out["collected"]) == 0
 
 
@@ -65,7 +67,7 @@ def test_select_question_sets_caution_from_user_messages_only():
     user = select_question({**base, "history": [{"role": "user", "content": "협박을 당했습니다"}]})
     assistant = select_question({**base, "history": [{"role": "user", "content": "사건 개요"},
                                                      {"role": "assistant", "content": "협박이 있었나요?"}]})
-    assert user["caution"] is True and assistant["caution"] is False
+    assert user["result"]["caution"] is True and assistant["result"]["caution"] is False
 
 
 def test_state_survives_a_new_graph_object(fake):
@@ -105,3 +107,15 @@ def test_sessions_do_not_share_state(fake):
     graph.invoke({"request": {"action": "message", "message": "네"}}, CONFIG)
     assert graph.get_state(other).values["history"] == [{"role": "user", "content": "다른 사건"}]
     assert graph.get_state(other).values["offense"] == "insult"
+
+
+def test_only_fixed_codes_are_plain_state_fields():
+    """문자열·숫자·불리언 값은 암호화 없이 저장된다. 대화에서 나온 글이 그런 자리에 놓이지 않게 막는다."""
+    from flow.state import PLAIN_FIELDS, ChatState, RagState
+
+    for schema in (ChatState, RagState):
+        for name, annotation in typing.get_type_hints(schema).items():
+            if name in PLAIN_FIELDS:
+                continue
+            container = typing.get_origin(annotation) or annotation
+            assert container in (dict, list), f"{schema.__name__}.{name}: {annotation}는 암호화되지 않는다"

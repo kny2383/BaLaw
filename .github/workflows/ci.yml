@@ -71,6 +71,22 @@ jobs:
     defaults:
       run:
         working-directory: ai
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_USER: baro
+          POSTGRES_PASSWORD: baro
+          POSTGRES_DB: baro_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U baro -d baro_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # 체크포인트 저장 테스트가 쓰는 테스트 전용 DB. 주소가 없으면 그 테스트는 건너뛰는데, CI에서는 건너뛰면 실패로 본다.
+      TEST_CHECKPOINT_DB_URL: postgresql://baro:baro@localhost:5432/baro_test
+      REQUIRE_DB_TESTS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
