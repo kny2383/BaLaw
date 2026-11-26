@@ -50,10 +50,11 @@ def test_owner_can_delete(client, user_tokens):
 def test_chat_init_uses_ai_service(client, user_tokens, monkeypatch):
     from app.api import complaint as complaint_api
 
-    calls = []
+    calls, known = [], []
 
-    async def fake_chat_init(text, offense=None):
+    async def fake_chat_init(text, offense=None, known_pii=None):
         calls.append((text, offense))
+        known.append(known_pii)
         return {"session_id": "fake-session", "offense": offense or "fraud", "message": "질문을 시작합니다."}
 
     monkeypatch.setattr(complaint_api.ai_service, "chat_init", fake_chat_init)
@@ -62,6 +63,10 @@ def test_chat_init_uses_ai_service(client, user_tokens, monkeypatch):
                     headers=auth_header(user_tokens))
     assert calls, "AI 서비스가 호출되지 않았다"
     assert r.status_code == 200, r.text
+    # 입력 화면에서 받은 이름·주소·전화번호를 AI 서비스에 알려 준다 (서술에서 찾아 가리게 한다).
+    assert known == [{"names": [COMPLAINANT["complainant_name"]],
+                      "addresses": [COMPLAINANT["complainant_address"]],
+                      "phones": [COMPLAINANT["complainant_phone"]]}]
 
 
 def test_chat_init_ai_failure_returns_503_and_keeps_complaint(client, db_session, user_tokens, monkeypatch):
@@ -69,7 +74,7 @@ def test_chat_init_ai_failure_returns_503_and_keeps_complaint(client, db_session
     from app.api import complaint as complaint_api
     from app.models.chat_message import ChatMessage
 
-    async def failing_chat_init(text, offense=None):
+    async def failing_chat_init(text, offense=None, known_pii=None):
         raise RuntimeError("upstream down")
 
     monkeypatch.setattr(complaint_api.ai_service, "chat_init", failing_chat_init)
@@ -197,3 +202,18 @@ def test_ai_client_delete_session(monkeypatch):
     with pytest.raises(RuntimeError):
         ai_service.delete_session("broken")
     assert seen == [("DELETE", "/chat/ok"), ("DELETE", "/chat/broken")]
+
+
+def test_known_pii_skips_placeholder_names(client, db_session, user_tokens):
+    """이름 칸에 '성명불상'처럼 값 대신 적은 말은 넘기지 않는다."""
+    from app.api.complaint import known_pii_of
+    from app.services.encryption_service import encryption_service
+
+    cid = create_complaint(client, user_tokens)
+    complaint = db_session.get(Complaint, cid)
+    complaint.accused_name = encryption_service.encrypt_field("성명불상")
+    complaint.accused_address = encryption_service.encrypt_field("부산광역시 가상구 가상로 9")
+    db_session.commit()
+    known = known_pii_of(db_session.get(Complaint, cid))
+    assert known["names"] == [COMPLAINANT["complainant_name"]]
+    assert known["addresses"] == [COMPLAINANT["complainant_address"], "부산광역시 가상구 가상로 9"]
