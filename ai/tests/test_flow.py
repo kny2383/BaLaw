@@ -228,6 +228,7 @@ def test_quote_not_in_the_draft_is_ignored(fake, monkeypatch):
 
 # ---------- 사용자 확인 (interrupt) ----------
 OTHER = "금원을"  # 가짜 초안에 들어 있는 다른 표현
+SENTENCE = "고소인은 피고소인에게 금원을 송금하였습니다."  # BAD와 OTHER가 든 초안의 문장
 
 
 def _compose_with_confirm(fake, monkeypatch, found, max_rewrites=1, confirm_max=5):
@@ -319,7 +320,8 @@ def test_second_verify_uses_the_confirmation(fake, monkeypatch):
     out = graph.invoke(Command(resume=[True, False]), CONFIG)
     assert _kinds(fake) == ["compose", "verify", "rewrite", "verify"]
     prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
-    assert f"사실이 맞습니다: {BAD}" in prompt
+    # 사용자가 확인한 범위는 구절이다. 문장은 뜻을 정하는 문맥으로만 적는다.
+    assert f'사실이 맞습니다: "{SENTENCE}"에서 "{BAD}" 부분' in prompt
     assert out["review"]["status"] == "rewritten" and out["review"]["rechecked"] is True
 
 
@@ -336,3 +338,51 @@ def test_confirm_limit_must_be_at_least_one(monkeypatch):
         cfg._at_least_one("DRAFT_CONFIRM_MAX", 5)
     monkeypatch.setenv("DRAFT_CONFIRM_MAX", "")
     assert cfg._at_least_one("DRAFT_CONFIRM_MAX", 5) == 5
+
+
+def test_claim_carries_the_sentence_it_sits_in(fake, monkeypatch):
+    """검증은 근거 없는 구절만 인용한다. 사용자에게 물을 때 보여 줄 문장은 초안에서 찾아 붙인다."""
+    _, _, out = _compose_with_confirm(fake, monkeypatch, [[BAD]])
+    assert out["review"]["unsupported"] == [{"quote": BAD, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
+
+
+def test_rewrite_is_told_which_sentence_the_phrase_is_in(fake, monkeypatch):
+    fake.verify_results = [[BAD]]
+    _compose(fake, monkeypatch)
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f'- "{BAD}" — 문장: "{SENTENCE}"' in prompt
+
+
+def test_whole_sentence_quote_is_not_repeated(fake, monkeypatch):
+    fake.verify_results = [[SENTENCE]]
+    out = _compose(fake, monkeypatch)
+    prompt = fake.requests[-1]["body"]["messages"][-1]["content"]
+    assert f'- "{SENTENCE}" (' in prompt and "— 문장:" not in prompt
+    assert out["review"]["removed"][0]["sentence"] == SENTENCE
+
+
+def test_bullet_mark_is_not_part_of_the_quote(fake, monkeypatch):
+    fake.verify_results = [["○ " + SENTENCE]]
+    out = _compose(fake, monkeypatch)
+    assert out["review"]["removed"] == [{"quote": SENTENCE, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
+
+
+def test_confirmation_records_only_the_confirmed_phrase_as_said(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER]])
+    out = graph.invoke(Command(resume=[True, True]), CONFIG)
+    assert out["history"][-1]["content"].endswith(
+        f'사실이 맞습니다: "{SENTENCE}"에서 "{BAD}" 부분 / "{SENTENCE}"에서 "{OTHER}" 부분')
+
+
+def test_whole_sentence_confirmation_is_recorded_as_is(fake, monkeypatch):
+    _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[SENTENCE]])
+    out = graph.invoke(Command(resume=[True]), CONFIG)
+    assert out["history"][-1]["content"].endswith(f'사실이 맞습니다: "{SENTENCE}"')
+
+
+def test_phrase_found_in_several_sentences_gets_no_sentence(fake, monkeypatch):
+    """같은 구절이 여러 문장에 있으면 어느 문장인지 정할 수 없다. 엉뚱한 문장을 붙이지 않는다."""
+    from services.verify import sentence_of
+    draft = "○ 고소인은 금원을 보냈습니다.\n○ 피고소인은 금원을 받았습니다."
+    assert sentence_of("금원을", draft) == "금원을"
+    assert sentence_of("보냈습니다", draft) == "고소인은 금원을 보냈습니다."

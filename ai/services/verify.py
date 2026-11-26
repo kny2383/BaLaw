@@ -27,7 +27,11 @@ VERIFY_RULES = (
     "- '모르겠다'고 한 것을 '확인하지 못하였다'고 적은 것\n"
     "- 사용자가 말한 사실에서 바로 따라 나오는 사실\n"
     "- 처벌을 바란다는 문장, 수사를 요청하는 문장\n\n"
-    "quote에는 초안의 해당 표현을 한 글자도 바꾸지 말고 그대로 옮기십시오. 문장 전체가 아니라 근거 없는 부분만 옮겨도 됩니다.\n"
+    "quote에는 초안에서 근거가 없는 부분만, 한 글자도 바꾸지 말고 그대로 옮기십시오.\n"
+    "- 문장 가운데 일부만 근거가 없으면 그 구절만 옮기십시오 "
+    "(예: '두려움을 느껴 요구에 응하여 송금하였다'에서 요구가 있었다는 말이 대화에 없으면 '요구에 응하여').\n"
+    "- 문장 전체가 근거 없을 때만 문장 전체를 옮기십시오.\n"
+    "- 한 문장에 근거 없는 구절이 여럿이면 구절마다 따로 적으십시오.\n"
     "reason에는 대화의 어느 부분과 맞지 않는지 한 문장으로 적으십시오.\n"
     "근거 없는 서술이 없으면 unsupported를 빈 목록으로 두십시오.\n"
     + PII_NOTE
@@ -39,7 +43,7 @@ REWRITE_SYSTEM = (
 )
 
 REWRITE_RULES = (
-    "아래 [초안]에서 [근거 없는 표현]에 적힌 부분만 고치십시오.\n"
+    "아래 [초안]에서 [근거 없는 표현]에 적힌 부분만 고치십시오. '문장:'이 함께 적혀 있으면 그 문장 안의 해당 구절입니다.\n"
     "- 사용자가 말하지 않은 내용은 지우십시오. 지운 뒤 문장이 어색하면 그 문장만 자연스럽게 다듬으십시오.\n"
     "- 사용자가 '모르겠다'고 답한 것을 단정한 서술은 지우거나 '확인하지 못하였습니다'로 바꾸십시오.\n"
     "- 새로운 사실, 날짜, 금액, 사람, 감정을 더하지 마십시오.\n"
@@ -60,18 +64,45 @@ def format_draft(sections: dict) -> str:
     return "\n\n".join(f"=== {title} ===\n{sections.get(key, '')}" for key, title in SECTION_TITLES.items())
 
 
+def sentence_of(quote: str, draft_text: str) -> str:
+    """인용이 들어 있는 초안의 문장(한 줄). 사용자에게 물을 때 구절이 놓인 문맥으로 보여 준다.
+
+    구절이 여러 줄에 걸치거나 여러 문장에 나오면 어느 문장인지 정할 수 없으므로 구절만 돌려준다.
+    """
+    lines = [line for line in draft_text.splitlines() if quote in line]
+    if len(lines) != 1:
+        return quote
+    return lines[0].strip().lstrip("○").strip()
+
+
 def verify_draft(history: list[dict], sections: dict) -> list[dict]:
     """초안에서 대화에 근거가 없는 표현을 찾는다 (LLM 호출). 실패하면 StructuredOutputError."""
     user = f"{VERIFY_RULES}\n[대화]\n{format_dialogue(history)}\n\n[초안]\n{format_draft(sections)}\n"
     out = respond_parsed(settings.OPENAI_CHAT_MODEL, VERIFY_SYSTEM, user, Verification)
     draft_text = format_draft(sections)
     # 초안에 없는 인용은 고칠 대상을 가리키지 못하므로 버린다.
-    return [c.model_dump() for c in out.unsupported if c.quote.strip() and c.quote.strip() in draft_text]
+    found = []
+    for c in out.unsupported:
+        # 글머리표는 문장의 일부가 아니다. 떼어 내야 문장 안에서 구절의 자리를 찾을 수 있다.
+        quote = c.quote.strip().lstrip("○").strip()
+        if quote and quote in draft_text:
+            found.append({"quote": quote, "reason": c.reason, "sentence": sentence_of(quote, draft_text)})
+    dropped = len(out.unsupported) - len(found)
+    if dropped:
+        print(f"[VERIFY] 초안에서 찾지 못한 인용 {dropped}개를 버림")
+    return found
+
+
+def _listed(claim: dict) -> str:
+    """재작성에 넘기는 한 줄. 구절이 짧으면 어느 문장의 것인지 함께 적는다."""
+    sentence = claim.get("sentence") or claim["quote"]
+    where = "" if sentence == claim["quote"] else f" — 문장: \"{sentence}\""
+    return f"- \"{claim['quote']}\"{where} ({claim['reason']})"
 
 
 def rewrite_draft(sections: dict, unsupported: list[dict]) -> dict | None:
     """근거 없는 표현만 고쳐 다시 쓴다 (LLM 호출). 쓸 수 있는 결과가 나오지 않으면 None."""
-    listed = "\n".join(f"- \"{c['quote']}\" ({c['reason']})" for c in unsupported)
+    listed = "\n".join(_listed(c) for c in unsupported)
     user = f"{REWRITE_RULES}\n[근거 없는 표현]\n{listed}\n\n[초안]\n{format_draft(sections)}\n"
     out = respond(settings.OPENAI_COMPOSE_MODEL, REWRITE_SYSTEM, user)
     new = split_complaint_sections(postprocess_complaint(out))
