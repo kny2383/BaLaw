@@ -14,6 +14,7 @@ _fake = FakeOpenAI()
 # 앱을 불러오기 전에 정해야 한다. cfg의 .env 읽기는 이미 있는 환경변수를 덮어쓰지 않는다.
 os.environ["OPENAI_API_KEY"] = "test-key"
 os.environ["OPENAI_BASE_URL"] = _fake.base_url
+os.environ["OPENAI_MODEL"] = "gpt-5-mini"  # 요청 기준 파일이 실행 환경의 모델 설정에 따라 달라지지 않게 고정한다
 os.environ["REDIS_URL"] = ""
 os.environ["OPENAI_EXTRACT_REASONING_EFFORT"] = "low"
 os.environ["DRAFT_MAX_REWRITES"] = "1"
@@ -23,7 +24,7 @@ os.environ["DRAFT_CONFIRM"] = "0"
 from fastapi.testclient import TestClient  # noqa: E402
 
 import baroai  # noqa: E402
-import services.openai_client as openai_client  # noqa: E402
+import services.llm as llm  # noqa: E402
 import services.rag as rag  # noqa: E402
 from flow import checkpoint  # noqa: E402
 
@@ -42,8 +43,8 @@ def session_ids():
 @pytest.fixture(autouse=True)
 def _no_real_openai():
     """모든 OpenAI 클라이언트가 가짜 서버를 보고 있는지 테스트마다 확인한다."""
-    assert str(openai_client.client().base_url).startswith("http://127.0.0.1:")
-    assert str(rag.openai_client.base_url).startswith("http://127.0.0.1:")
+    for task in llm.TASKS:
+        assert str(llm._model(task).root_client.base_url).startswith("http://127.0.0.1:"), task
     yield
 
 

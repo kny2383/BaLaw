@@ -11,7 +11,7 @@ from flow.chat_graph import build_chat_graph, claims_to_confirm
 from flow.checkpoint import chat_config, delete_session, prune_session, rag_config
 from flow.rag_graph import build_rag_graph, failed_result
 from services import pii
-from services.openai_client import LLMCallError, StructuredOutputError
+from services.llm import LLMCallError, StructuredOutputError
 from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
 from langgraph.types import Command

@@ -1,0 +1,780 @@
+{
+ "compose": {
+  "messages": [
+   {
+    "content": "You are a drafting assistant for Korean criminal complaints.\nProduce legal-style paragraphs in Korean.",
+    "role": "system"
+   },
+   {
+    "content": "당신은 당신은 사용자의 두서없는 진술을 한국 형사 고소장의 초안을 작성하는 전문 비서입니다.\n아래의 '사건 요소(JSON)'와 '증거 메모'를 참고하여,\n'범죄사실'과 '고소이유'를 한국어 줄글(문단 형태)로 작성하십시오.\n'범죄사실'은 형법 등 처벌법규에 해당하는 사실에 대하여 일시, 장소, 범행방법, 결과 등을 특정하여 필요한 사항만 간략하게 기재해야 하며, 고소인이 알고 있는 지식과 경험, 증거에 의해 사실로 인정되는 내용을 기재하여야 합니다.\n'범죄사실'의 맨 처음에 고소인과 피고소인의 관계(어떻게 알게 된 사이인지)를 간략히 서술하십시오. 관계가 사건 데이터에 없으면 이 문장은 쓰지 않습니다.\n'고소이유'에는 피고소인의 범행 경위 및 정황, 고소를 하게 된 동기와 사유 등 범죄사실을 뒷받침하는 내용을 인과관계에 맞게 시간순으로 구체적으로 기재해야 합니다.\n실제 대화내용과 고소인이 가지고 있다고 말한 증빙자료는 '범죄사실'부분이 아닌 '고소이유'부분에 서술합니다.\n'고소이유'의 마지막에 피고소인의 처벌을 요구하는 문장을 추가하십시오.(예: 위와 같은 사실에 대하여 피고소인을 수사하여 엄벌에 처해주시기 바랍니다.) 이 문장에 피해의 정도나 감정을 넣지 마십시오.\n\n규칙:\n- 실제 고소장 문체로, '누가/언제/어디서' 같은 메타 항목명을 노출하지 말고, 문장 속에 자연스럽게 녹여 쓰십시오.\n- 보고서체/목록체/메모체 금지. 법률적 판단이나 추론을 임의로 더하지 말고, 완전한 문장으로, 중립적·객관적 서술을 유지하십시오.\n- 죄명·조문은 RAG로 제공된 스니펫 내에서만 언급하십시오(환각 금지).\n- 문체는 형사 고소장 기준의 **격식 있는 존댓말**로 작성하고, 모든 문장을 '…하였습니다', '…한 사실이 있습니다' 등 **'-습니다'체**로 끝내십시오. '…했다', '…하였다'와 같은 평서형 과거 시제는 사용하지 마십시오.\n- 문체는 형사 고소장 기준으로, 주체는 '고소인', 상대방은 '피고소인'으로 표기합니다.\n- '원고/피고'라는 단어는 절대 사용하지 않습니다.\n\n- 전달받은 사건 데이터(JSON)나 증거 메모에 '~일걸?', '잘은 기억 안 나', '쯤' 등 사용자가 불확실함을 표현한 뉘앙스가 있다면, 해당 정보에 대해 단정적인 표현을 절대 피하십시오.\n- 날짜/시간뿐만 아니라 장소, 금액, 대화 내용 등 모든 불확실한 정보는 위험한 구체적 디테일(분 단위, 정확한 액수, 단어의 완벽한 인용 등)을 과감히 생략하십시오.\n- 대신 상황에 맞게 '~경'(시간), '~상당'(금액/물품), '~부근/인근'(장소), '~라는 취지로'(대화/문자 내용) 등 포괄적이고 방어적인 표현으로 둥글게 순화하여 고소장 본문에 기재하십시오.\n\n- 반대로, 사용자가 '정확하게', '분명히'라고 확언하거나 분 단위, 원 단위까지 명확하게 진술한 정보(예: \"정확히 12시 1분\")는 절대 뭉뚱그리거나 생략하지 말고, 그 구체적인 수치와 사실을 고소장 본문에 그대로 정확하게 기재하십시오.\n\n[문체 참고 예시(요약형 샘플)]\n아래는 '범죄사실/고소이유'가 구분된 예시입니다(데이터는 비식별·가공됨).\n\n# 예시(사기)\n4. 범죄사실\n○ {PERSON}은 {COMPANY} ○○{PERSON} {PERSON} {PERSON}, {PERSON}{PERSON} {PERSON}의 {PERSON} ○○○{PERSON}터 20○○.\n○ ○월 {PERSON} {PERSON}아 {PERSON} {PERSON}{PERSON}.\n○ {PERSON}{PERSON} {PERSON} {COMPANY} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON} {PERSON} 할 {PERSON} {PERSON} {PERSON}이 {PERSON} {PERSON} {PERSON}고 한 후 20○○.\n○ ○월 {PERSON} {PERSON}의 {PERSON}로 {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} ○○{PERSON} {PERSON}{PERSON}다.\n\n5. 고소이유\n○ {PERSON}{PERSON} {PERSON}{PERSON} {COMPANY} {PERSON}{PERSON} {PERSON}는 {PERSON}다.\n○ 20○○.\n○ ○.\n\n# 예시(사기)\n4. 범죄사실\n○ {PERSON}{PERSON} {PERSON}{PERSON} {COMPANY} {PERSON}{PERSON} {PERSON}는 {PERSON}다.\n○ {DATE}경 {PERSON} {PERSON} {PERSON} {ADDR_DETAIL}에 {PERSON} 00{PERSON}{PERSON}, {PERSON}{PERSON} {PERSON} 00구 00동 00{PERSON} {PERSON}{PERSON} {PERSON} {PERSON} 해 줄 {PERSON} {PERSON} {PERSON}도 {PERSON}{PERSON} “00{PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}비 {AMOUNT}을 {PERSON} {PERSON}다 20%{PERSON} 싼 {PERSON} {PERSON} {PERSON} {PERSON} 해 {PERSON}”고 {PERSON}{PERSON} {PERSON} {PERSON} {PERSON}{PERSON}터 {DATE} {PERSON} {PERSON} 금 {AMOUNT}을 {PERSON} {PERSON} {PERSON}{PERSON}.\n\n5. 고소이유\n○ {PERSON}은 {COMPANY} 00{PERSON} {PERSON} {PERSON}, {PERSON}{PERSON} {PERSON}의 {PERSON} 강00{PERSON}터 2006. 2.{PERSON} {PERSON}아 {PERSON} {PERSON}{PERSON}.\n○ {PERSON}{PERSON} {PERSON} {COMPANY} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON} {PERSON} 할 {PERSON} {PERSON} {PERSON}이 {PERSON} {PERSON} {PERSON}고 한 후 2006. 2.{PERSON} {PERSON}의 {PERSON}로 {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} 00{PERSON} {PERSON}{PERSON}다.\n○ {PERSON} {PERSON}은 {DATE} {TIME} {PERSON} {PERSON} {PERSON} {ADDR_DETAIL}에 {PERSON} 00{PERSON}{PERSON} {PERSON}{PERSON} {PERSON}데 그 {PERSON}서 {PERSON}{PERSON} “00{PERSON} {PERSON} {PERSON} {PERSON}금 {PERSON} {PERSON} {PERSON} 101{PERSON} {PERSON} {PERSON} 내 {PERSON}. {PERSON}비 {AMOUNT}을 {PERSON} 00{PERSON} {PERSON}다 20%{PERSON} 싼 {PERSON} {PERSON} {PERSON} {PERSON} 해 {PERSON} {PERSON}{PERSON} {PERSON}는 {PERSON}서 {PERSON}관 {PERSON} {PERSON} {PERSON}”고 {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON}{PERSON}를 {PERSON}{PERSON}다.\n\n\n[문체 참고 예시(통합 고소장 샘플)]\n아래는 실제 고소장 전체 단락에서 추출한 문장 패턴입니다. 문체와 서술 흐름을 참고만 하십시오.\n\n\n○ ○ {PERSON}은 20 .\n\n○ ○ 1.\n\n○ ○ {PERSON}터 {PERSON}인 {PERSON} {PERSON}인 {PERSON} {PERSON} {PERSON} {PERSON}로 {PERSON} {PERSON}딩 1층 {PERSON} 약 30㎡를 ({PERSON} {AMOUNT}, {PERSON} {AMOUNT}, {PERSON}간 2년) {PERSON}여, '{PERSON}{PERSON}'{PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON}여 {PERSON}던 중, {ADDR_DETAIL} .\n\n○ ○ 5{PERSON} 2{PERSON} {PERSON} {PERSON}게 {PERSON}바, {PERSON}{PERSON} 20 .\n\n○ ○ 7.\n\n○ ○ 11.\n\n○ ○ {PERSON} 7{PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON}래 {PERSON}를 {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON} {PERSON}게 {PERSON}, 그 {PERSON}도 3{PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON} {PERSON} 등 {PERSON}{PERSON} 한 {PERSON} {PERSON}다.\n\n○ ○ {PERSON} {PERSON}은 {PERSON} {PERSON} 할 수 {PERSON} {PERSON} {PERSON} 이 {PERSON}을 {PERSON}{PERSON} {PERSON} {PERSON}는 {PERSON} {PERSON} {PERSON}오.\n\n○ ○ {PERSON} {PERSON}{PERSON} {PERSON}은 {PERSON} {PERSON} {PERSON}로 {PERSON}여 1999년 9{PERSON} {PERSON}{PERSON} {PERSON} ○○○을 {PERSON} {PERSON}사 ○○○○를 {PERSON}게 {PERSON} 본 {PERSON} 15% {PERSON} {PERSON}여 {PERSON}{PERSON} {PERSON} {PERSON} {PERSON}여 수 {PERSON} {PERSON} {PERSON} {PERSON}여 {PERSON}고 {DATE}{PERSON} {PERSON} {PERSON}{PERSON}{PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON}{PERSON} {PERSON} {PERSON}여 {PERSON} {AMOUNT}, {PERSON} {AMOUNT}, {PERSON} {AMOUNT}을 {PERSON}고 {PERSON} ○○○은 수 {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}고 술 {PERSON} 수 {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON} {PERSON}{PERSON}.\n\n○ ○ 2.\n\n○ ○ {PERSON} {PERSON}은 {PERSON}{PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON}이 더 {PERSON} {PERSON} {PERSON} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON}{PERSON} {PERSON} {PERSON} {PERSON}와 {PERSON}{PERSON}을 {PERSON} {PERSON}에 {PERSON}{PERSON} {PERSON}{PERSON} {PERSON}여 {PERSON} {PERSON}{PERSON} {PERSON}다.\n\n○ ○ {PERSON}{PERSON} 20○○.\n\n○ ○ ○.\n\n○ ○ ○○:○○경 ○○시 ○○구 ○○동 ○○에 {PERSON} {PERSON}의 {PERSON} {PERSON}{PERSON}터 \"{PERSON} 20○○.\n\n○ ○ {PERSON}일 {PERSON} 해 ○.\n\n\n[출력 형식]\n4. 범죄사실 \n○ ...\n○ ...\n\n5. 고소이유 \n○ ...\n○ ...\n\n[사건 요소(JSON)]\n{\"deception\": {\"status\": \"satisfied\", \"slots\": {\"quote\": \"present\", \"who\": \"present\", \"role_claim\": \"present\", \"third_party\": \"present\", \"doc_or_link\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"disposition\": {\"status\": \"satisfied\", \"slots\": {\"what_action\": \"present\", \"to_whom\": \"present\", \"contract\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"causation\": {\"status\": \"satisfied\", \"slots\": {\"timeline\": \"present\", \"why_believed\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"property_gain\": {\"status\": \"satisfied\", \"slots\": {\"proof\": \"present\", \"recovery_status\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}}\n\n[사건 디테일(JSON)]\n{\"detail_datetime\": {\"status\": \"satisfied\", \"slots\": {\"date\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"detail_place_or_platform\": {\"status\": \"satisfied\", \"slots\": {\"channel_or_place\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"detail_transfer\": {\"status\": \"satisfied\", \"slots\": {\"method\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"detail_recipient\": {\"status\": \"satisfied\", \"slots\": {\"recipient_name_or_handle\": \"present\", \"bank_name\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}, \"detail_amount\": {\"status\": \"satisfied\", \"slots\": {\"amount_numeric_or_item_value\": \"present\"}, \"evidence\": \"\", \"summary\": \"확인된 내용을 정리했습니다.\"}}\n\n[증거 메모]\n[]\n\n주의:\n- detail_item_or_service.goods_or_service 값이 present라면 브랜드/모델/서비스 명칭을 그대로 서술에 반영하고 '물품'과 같은 모호한 표현을 피하십시오.\n- 조문/항 번호는 검색 또는 예시에 포함된 경우에만 사용하십시오(임의 생성 금지).\n- 불명확/누락 정보는 본문에 표기하지 않으며, 상황을 임의로 파악하여 기재하지 않습니다.\n- '[이름1]', '[전화번호1]', '[계좌번호1]', '[주소1]' 같은 표식은 가려 둔 실제 값입니다. 값이 주어진 것으로 보고, 쓸 때는 표식을 한 글자도 바꾸지 말고 그대로 옮기십시오.\n- 사건 데이터(JSON)에 있는 사실만 쓰십시오. 다음은 데이터에 그대로 있을 때만 씁니다: 고소인의 감정과 피해의 정도, 누가 요구·안내·거부·지시했는지, 계좌나 앱이 누구의 것인지, 횟수와 반복 여부, 반환이나 환불을 요청했는지와 그 결과.\n- 돈을 받은 사람이나 계좌 주인이 피고소인이라고 데이터에 나와 있지 않으면 '피고소인의 계좌', '피고소인이 안내한 계좌', '피고소인에게 송금'이라고 쓰지 마십시오.\n- slots 값이 missing, unclear, unknown인 항목은 쓰지 마십시오. 특히 그 항목이 '없다', '보유하고 있지 않다', '제공되지 않았다'고 쓰지 마십시오.\n- summary의 '확인이 필요합니다', '제공되지 않았습니다', '기재되어 있지 않습니다' 같은 점검 문구는 사실이 아니므로 본문에 옮기지 마십시오.\n- 명백한 사실이 아닌 사항에 대해 단정적인 어조를 절대 사용하지 마십시오.\n- 주어진 정보 안에서 시간순으로 인과에 맞게 서술하되, 불필요하게 장황하거나 중복되는 표현은 피하십시오. 정보가 적으면 초안도 짧게 쓰십시오.\n- 고소장 본문 서술시 '~하였습니다.', '~한 사실이 있습니다.', '~입니다.' 등 당당하고 명확한 서술형 종결어미를 사용하십시오.\n- **'사건 디테일(JSON)'의 일시(날짜/시간/범위), 주소/플랫폼, 금액, 이체 방식, 브랜드/모델/서비스 명칭 등의 정보를 서술에 반드시 반영하십시오.**\n- 날짜는 가능하면 'YYYY. M. D.' 형식으로 기재하십시오(예: 2024. 5. 18.).\n- 일시를 서술할 때 '~경'을 중복해서 사용하지 마십시오. (나쁜 예: 2026. 6. 1.경 오후 9시경 / 좋은 예: 2026. 6. 1. 오후 9시경)\n- 어떤 물품을 구입/이용했는지 알 수 있는 경우, 물품명과 브랜드/모델/서비스 명칭을 반드시 기재하십시오.\n\n- 본 사건이 사기죄에 해당하는 경우, 범죄사실 및 고소이유를 작성할 때 - 온라인 닉네임이나 아이디(예: '또리엄마')는 가해자를 특정하는 중요한 단서이므로 고소장 본문에서 설명시 절대 누락하지 마십시오.\n- 단, 위 닉네임을 은행 계좌의 '실명 예금주'로 오인하여 기재해서는 안 됩니다.\n기망행위(거짓말·허위 약속) → 그로 인한 고소인의 착오 → 금전 지급 등 재산적 처분행위 → 재산상 손해 가운데 사건 데이터에 대응하는 사실이 있는 단계만 시간 순서대로 드러내십시오.\n- 대응하는 사실이 데이터에 없는 단계는 쓰지 마십시오. 단계를 채우려고 사실을 더하지 마십시오.\n- ‘기망’, ‘착오’, ‘재산적 처분행위’, ‘재산상 손해’라는 용어는 대응하는 사실을 서술한 단계에만 쓰십시오.\n",
+    "role": "user"
+   }
+  ],
+  "model": "gpt-5-mini"
+ },
+ "extract": {
+  "messages": [
+   {
+    "content": "You are an assistant that extracts facts for a legal complaint draft. Do not give legal advice. Use ONLY the user's text.",
+    "role": "system"
+   },
+   {
+    "content": "아래 '법적 구성요건(elements)'과 '디테일(details)' 스키마에 따라, 사용자의 서술을 **매우 보수적**으로 평가하세요.\n- 텍스트에 **명시**되지 않거나 아직 언급이 없으면 추론하지 말고 'missing'으로 표기\n- '[이름1]', '[전화번호1]', '[계좌번호1]', '[주소1]' 같은 표식은 가려 둔 실제 값입니다. 값이 주어진 것으로 보고, 쓸 때는 표식을 한 글자도 바꾸지 말고 그대로 옮기십시오.\n-**[증거 추측 절대 금지]** 사용자가 단순히 '캡처해뒀다', '증거 있다'라고만 한 경우, 'summary'나 'evidence'에 '송금 내역', '채팅 캡처' 등 사용자가 직접 입 밖으로 꺼내지 않은 구체적인 단어를 임의로 지어내어(환각) 기재하지 마십시오.\n- '쯤/경/대략', '확실하지 않다' 등의 표현이 섞여 있더라도, 해당 항목에 필요한 구체적인 데이터가 제공되었다면 'present'로 인정하세요.\n- 단, 주의하세요! '시간(예: 6시 15분)'만 있고 '정확한 날짜(예: 몇 월 몇 일)'는 없는 경우처럼, 해당 슬롯이 요구하는 **핵심 정보가 누락된 경우에는 통과시키지 말고 반드시 'missing'으로 표기**하여 재질문을 유도하십시오.\n- 구체적인 데이터 없이 오직 '모른다', '없다'고 명확히 거절/답변한 항목은 **반드시 'unknown'**으로 기재하십시오.\n- 'summary'는 단순히 사용자의 말을 앵무새처럼 요약하는 필드가 아닙니다! 해당 항목에서 어떤 정보는 확인되었고, 반대로 '어떤 정보가 아직 비어있어서(missing) 이 추가 질문을 던지는 것인지' 그 이유(명분)를 상담원처럼 부드럽게 간략한 1문장으로 짚어주세요.\n- 각 항목의 status는 'satisfied|missing|unclear'\n- 각 항목의 slots 값은 'present|missing|unclear|unknown' 중 하나만 사용할 것.\n- 가능할 때 evidence에 짧게 한 구절만 인용(없으면 빈 문자열)\n\nJSON만 출력:\n{\n  \"elements\": {\n    \"<element_id>\": {\n      \"status\": \"satisfied|missing|unclear\",\n      \"slots\": {\"<slot>\": \"present|missing|unclear|unknown\", ...},\n      \"evidence\": \"<짧은 인용 또는 빈 문자열>\",\n      \"summary\": \"법률 용어 제외, 경어체로 부족한 정보(질문 이유)를 짚어주는 1문장 요약\"\n    }, ...\n  },\n  \"details\": {\n    \"<detail_id>\": {\n      \"status\": \"satisfied|missing|unclear\",\n      \"slots\": {\"<slot>\": \"present|missing|unclear|unknown\", ...},\n      \"evidence\": \"<짧은 인용 또는 빈 문자열>\",\n      \"summary\": \"법률 용어 제외, 부족한 정보(질문 이유)를 짚어주는 경어체로 1문장 요약\"\n    }, ...\n  }\n}\n\n[elements]\n- deception:기망행위 | must=['quote', 'who'] | nice_to_have=['role_claim', 'third_party', 'doc_or_link']\n- disposition:처분행위 | must=['what_action', 'to_whom'] | nice_to_have=['contract']\n- causation:인과관계 | must=['timeline', 'why_believed'] | nice_to_have=[]\n- property_gain:재산상 손해 | must=['proof'] | nice_to_have=['recovery_status']\n\n[details]\n- detail_datetime:일시 | must=['date'] | nice_to_have=[]\n- detail_place_or_platform:플랫폼/앱 또는 장소 | must=['channel_or_place'] | nice_to_have=[]\n- detail_transfer:금전 처분 방식 | must=['method'] | nice_to_have=[]\n- detail_recipient:거래 상대 식별 | must=['recipient_name_or_handle'] | nice_to_have=['bank_name']\n- detail_amount:금액/가액 및 거래 품목/서비스 | must=['amount_numeric_or_item_value'] | nice_to_have=[]\n\n[사용자 서술]\n중고거래로 30만원을 보냈는데 물건이 오지 않았습니다.\n위 사건 개요를 기반으로, 이어서 질문을 해 주세요.",
+    "role": "user"
+   }
+  ],
+  "model": "gpt-5-mini",
+  "reasoning_effort": "low",
+  "response_format": {
+   "json_schema": {
+    "name": "Extraction_fraud",
+    "schema": {
+     "$defs": {
+      "fraud_details": {
+       "additionalProperties": false,
+       "properties": {
+        "detail_amount": {
+         "$ref": "#/$defs/fraud_details_detail_amount"
+        },
+        "detail_datetime": {
+         "$ref": "#/$defs/fraud_details_detail_datetime"
+        },
+        "detail_place_or_platform": {
+         "$ref": "#/$defs/fraud_details_detail_place_or_platform"
+        },
+        "detail_recipient": {
+         "$ref": "#/$defs/fraud_details_detail_recipient"
+        },
+        "detail_transfer": {
+         "$ref": "#/$defs/fraud_details_detail_transfer"
+        }
+       },
+       "required": [
+        "detail_datetime",
+        "detail_place_or_platform",
+        "detail_transfer",
+        "detail_recipient",
+        "detail_amount"
+       ],
+       "title": "fraud_details",
+       "type": "object"
+      },
+      "fraud_details_detail_amount": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_details_detail_amount_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_details_detail_amount",
+       "type": "object"
+      },
+      "fraud_details_detail_amount_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "amount_numeric_or_item_value": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Amount Numeric Or Item Value",
+         "type": "string"
+        }
+       },
+       "required": [
+        "amount_numeric_or_item_value"
+       ],
+       "title": "fraud_details_detail_amount_slots",
+       "type": "object"
+      },
+      "fraud_details_detail_datetime": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_details_detail_datetime_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_details_detail_datetime",
+       "type": "object"
+      },
+      "fraud_details_detail_datetime_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "date": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Date",
+         "type": "string"
+        }
+       },
+       "required": [
+        "date"
+       ],
+       "title": "fraud_details_detail_datetime_slots",
+       "type": "object"
+      },
+      "fraud_details_detail_place_or_platform": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_details_detail_place_or_platform_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_details_detail_place_or_platform",
+       "type": "object"
+      },
+      "fraud_details_detail_place_or_platform_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "channel_or_place": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Channel Or Place",
+         "type": "string"
+        }
+       },
+       "required": [
+        "channel_or_place"
+       ],
+       "title": "fraud_details_detail_place_or_platform_slots",
+       "type": "object"
+      },
+      "fraud_details_detail_recipient": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_details_detail_recipient_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_details_detail_recipient",
+       "type": "object"
+      },
+      "fraud_details_detail_recipient_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "bank_name": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Bank Name",
+         "type": "string"
+        },
+        "recipient_name_or_handle": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Recipient Name Or Handle",
+         "type": "string"
+        }
+       },
+       "required": [
+        "recipient_name_or_handle",
+        "bank_name"
+       ],
+       "title": "fraud_details_detail_recipient_slots",
+       "type": "object"
+      },
+      "fraud_details_detail_transfer": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_details_detail_transfer_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_details_detail_transfer",
+       "type": "object"
+      },
+      "fraud_details_detail_transfer_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "method": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Method",
+         "type": "string"
+        }
+       },
+       "required": [
+        "method"
+       ],
+       "title": "fraud_details_detail_transfer_slots",
+       "type": "object"
+      },
+      "fraud_elements": {
+       "additionalProperties": false,
+       "properties": {
+        "causation": {
+         "$ref": "#/$defs/fraud_elements_causation"
+        },
+        "deception": {
+         "$ref": "#/$defs/fraud_elements_deception"
+        },
+        "disposition": {
+         "$ref": "#/$defs/fraud_elements_disposition"
+        },
+        "property_gain": {
+         "$ref": "#/$defs/fraud_elements_property_gain"
+        }
+       },
+       "required": [
+        "deception",
+        "disposition",
+        "causation",
+        "property_gain"
+       ],
+       "title": "fraud_elements",
+       "type": "object"
+      },
+      "fraud_elements_causation": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_elements_causation_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_elements_causation",
+       "type": "object"
+      },
+      "fraud_elements_causation_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "timeline": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Timeline",
+         "type": "string"
+        },
+        "why_believed": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Why Believed",
+         "type": "string"
+        }
+       },
+       "required": [
+        "timeline",
+        "why_believed"
+       ],
+       "title": "fraud_elements_causation_slots",
+       "type": "object"
+      },
+      "fraud_elements_deception": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_elements_deception_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_elements_deception",
+       "type": "object"
+      },
+      "fraud_elements_deception_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "doc_or_link": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Doc Or Link",
+         "type": "string"
+        },
+        "quote": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Quote",
+         "type": "string"
+        },
+        "role_claim": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Role Claim",
+         "type": "string"
+        },
+        "third_party": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Third Party",
+         "type": "string"
+        },
+        "who": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Who",
+         "type": "string"
+        }
+       },
+       "required": [
+        "quote",
+        "who",
+        "role_claim",
+        "third_party",
+        "doc_or_link"
+       ],
+       "title": "fraud_elements_deception_slots",
+       "type": "object"
+      },
+      "fraud_elements_disposition": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_elements_disposition_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_elements_disposition",
+       "type": "object"
+      },
+      "fraud_elements_disposition_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "contract": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Contract",
+         "type": "string"
+        },
+        "to_whom": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "To Whom",
+         "type": "string"
+        },
+        "what_action": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "What Action",
+         "type": "string"
+        }
+       },
+       "required": [
+        "what_action",
+        "to_whom",
+        "contract"
+       ],
+       "title": "fraud_elements_disposition_slots",
+       "type": "object"
+      },
+      "fraud_elements_property_gain": {
+       "additionalProperties": false,
+       "properties": {
+        "evidence": {
+         "title": "Evidence",
+         "type": "string"
+        },
+        "slots": {
+         "$ref": "#/$defs/fraud_elements_property_gain_slots"
+        },
+        "status": {
+         "enum": [
+          "satisfied",
+          "missing",
+          "unclear"
+         ],
+         "title": "Status",
+         "type": "string"
+        },
+        "summary": {
+         "title": "Summary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "status",
+        "slots",
+        "evidence",
+        "summary"
+       ],
+       "title": "fraud_elements_property_gain",
+       "type": "object"
+      },
+      "fraud_elements_property_gain_slots": {
+       "additionalProperties": false,
+       "properties": {
+        "proof": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Proof",
+         "type": "string"
+        },
+        "recovery_status": {
+         "enum": [
+          "present",
+          "missing",
+          "unclear",
+          "unknown"
+         ],
+         "title": "Recovery Status",
+         "type": "string"
+        }
+       },
+       "required": [
+        "proof",
+        "recovery_status"
+       ],
+       "title": "fraud_elements_property_gain_slots",
+       "type": "object"
+      }
+     },
+     "additionalProperties": false,
+     "properties": {
+      "details": {
+       "$ref": "#/$defs/fraud_details"
+      },
+      "elements": {
+       "$ref": "#/$defs/fraud_elements"
+      }
+     },
+     "required": [
+      "elements",
+      "details"
+     ],
+     "title": "Extraction_fraud",
+     "type": "object"
+    },
+    "strict": true
+   },
+   "type": "json_schema"
+  },
+  "stream": false
+ },
+ "rag_keyword": {
+  "messages": [
+   {
+    "content": "\n    너는 형사 사건 고소장을 분류하는 보조 도구야.\n\n    [규칙]\n    - 아래 '죄목 리스트'에 있는 항목들 중에서 **가장 관련성이 높은 죄목 하나만** 골라서 출력해라.\n    - 애매하더라도, 리스트 중에서 가장 가까운 죄목을 하나 선택해라.\n    - '기타', '모름' 같은 단어는 절대 쓰지 말고, 죄목 이름만 딱 한 단어(또는 한 구절)로 출력해라.\n\n    [죄목 리스트]\n    사기, 특정경제범죄가중처벌등에관한법률위반, 특정범죄가중처벌등에관한법률위반, 도로교통법위반, 폭력행위등처벌에관한법률위반, 업무방해, 공직선거법위반, 사문서위조, 위조사문서행사, 마약류관리에관한법률위반, 성폭력범죄의처벌등에관한특례법위반, 업무상횡령, 상해, 횡령, 업무상배임, 근로기준법위반, 조세범처벌법위반, 의료법위반, 절도, 무고, 정보통신망이용촉진및정보보호등에관한법률위반, 뇌물공여, 부착명령, 성폭력범죄의처벌및피해자보호등에관한법률위반, 명예훼손, 폭행, 뇌물수수, 배임수재, 교통사고처리특례법위반, 공무집행방해, 변호사법위반, 국가보안법위반, 아동·청소년의성보호에관한법률위반, 살인, 배임, 저작권법위반, 재물손괴, 공직선거, 선거부정방지법위반, 정치자금법위반, 관세법위반, 위계공무집행방해, 모욕, 전자금융거래법위반, 위증, 공정증서원본불실기재, 불실기재공정증서원본행사, 식품위생법위반, 업무상과실치사, 공갈, 배임증재, 부정수표단속법위반, 부정경쟁방지및영업비밀보호에관한법률위반, 약사법위반, 외국환거래법위반, 증권거래법위반, 협박, 아동복지법위반, 업무상과실치상, 도시, 강제집행면탈, 병역법위반, 자동차관리법위반, 집회및시위에관한법률위반, 주거환경정비법위반, 보건범죄단속에관한특별조치법위반, 직권남용권리행사방해, 노동조합, 주거침입, 자본시장과금융투자업에관한법률위반, 공문서위조, 배상명령신청, 상법위반, 노동관계조정법위반, 상표법위반, 건설산업기본법위반, 여신전문금융업법위반, 강제추행, 위조공문서행사, 특수절도, 허위공문서작성, 폐기물관리법위반, 범인도피교사, 청소년의성보호에관한법률위반, 일반교통방해, 아동, 허위작성공문서행사, 산업안전보건법위반, 특정경제범죄가중처벌 등에 관한 법률 위반, 강도상해, 공전자기록등불실기재, 불실기재공전자기록등행사, 범인도피, 간통, 개인정보보호법위반, 강요, 도로교통법 위반, 위조유가증권행사, 공무상비밀누설, 성매매알선등행위의처벌에관한법률위반, 청소년보호법위반, 음반·비디오물및게임물에관한법률위반, 직무유기, 폭력행위 등 처벌에 관한 법률 위반, 건축법위반, 사문서변조, 변조사문서행사, 컴퓨터등사용사기, 특수강도, 출판물에의한명예훼손, 유가증권위조, 특수공무집행방해, 게임산업진흥에관한법률위반, 근로자퇴직급여보장법위반, 입찰방해, 건조물침입, 주택법위반, 출입국관리법위반, 도박개장, 자동차손해배상보장법위반, 제3자뇌물취득, 농업협동조합법위반, 자격모용사문서작성, 국가보안법 위반, 국민체육진흥법위반, 도검, 석유, 공문서부정행사, 특수공무집행방해치상, 총포, 집회, 공무상표시무효, 권리행사방해, 석유대체연료사업법위반, 성폭력범죄의 처벌 등에 관한 특례법 위반, 여객자동차운수사업법위반, 화약류등단속법위반, 점유이탈물횡령, 특수상해, 부동산중개업법위반, 자격모용작성사문서행사, 주민등록법위반, 위증교사, 업무상 배임, 치료감호, 변조공문서행사, 범죄수익은닉의규제및처벌등에관한법률위반, 특정범죄가중처벌 등에 관한 법률 위반, 성폭력범죄의 처벌, 공문서변조, 강도, 야간주거침입절도, 감금, 특정 경제범죄 가중처벌등에 관한 법률위반, 개발제한구역의지정, 관리에관한특별조치법위반, 폭력행위등 처벌에 관한 법률위반, 정보보호 등에 관한 법률 위반, 강간, 제3자뇌물교부, 정치자금에관한법률위반, 증거위조교사, 정보통신망 이용촉진, 아동학대범죄의처벌등에관한특례법위반, 부동산등기특별조치법위반, 증거인멸교사, 강간치상, 전기통신사업법위반, 지방공무원법위반, 시위에 관한 법률 위반, 직업안정법위반, 도로법위반, 수산업법위반, 컴퓨터등장애업무방해, 사행행위등규제, 국가공무원법위반, 청소년의 성보호에 관한 법률 위반, 방문판매등에관한법률위반, 통신비밀보호법위반, 사립학교법위반, 국토의계획및이용에관한법률위반, 저작권법 위반, 업무 방해, 의료법 위반, 새마을금고법위반, 장물취득, 대기환경보전법위반, 석유사업법위반, 처벌특례법위반, 부정처사후수뢰, 공중위생관리법위반, 공용물건손상, 도박공간개설, 증거인멸, 지방교육자치에관한법률위반, 공무집행 방해, 공직 선거법 위반, 특정 범죄 가중 처벌등에 관한 법률 위반, 특정 경제 범죄 가중 처벌등에 관한 법률 위반, 공공단체등위탁선거에관한법률위반, 미성년자의제강제추행, 부동산실권리자명의등기에관한법률위반, 대외무역법위반, 상호저축은행법위반, 화물자동차운수사업법위반, 특허법위반, 일반교통방해·집회및시위에관한법률위반, 강간상해, 업무상 횡령, 특정경제범죄가중처벌등에 관한 법률 위반, 사체유기, 준강간, 풍속영업의규제에관한법률위반, 업무방해·폭력행위등처벌에관한법률위반, 방송법위반, 공직선거법 위반, 특수협박, 위조 사문서 행사, 상표법 위반, 마약류관리에 관한 법률 위반, 특정범죄 가중처벌등에 관한 법률위반, 보호관찰명령, 공연음란, 윤락행위등방지법위반, 수뢰후부정처사, 상습사기, 경범죄처벌법위반, 야간건조물침입절도, 의료기기법위반, 정치자금법 위반, 부정경쟁방지, 정보통신망이용촉진, 외국환관리법위반, 군사기밀보호법위반, 강도살인, 증권거래법위반·특정경제범죄가중처벌등에관한법률위반, 부당이득, 위조사서명행사, 특정범죄가중처벌등에 관한 법률 위반, 독점규제및공정거래에관한법률위반, 폭력행위등 처벌에 관한 법률 위반, 사문서 위조, 정보보호등에 관한 법률위반, 피해자보호 등에 관한 법률 위반, 가축분뇨의관리및이용에관한법률위반, 국가정보원법위반, 유해화학물질관리법위반, 법무사법위반, 농지법위반, 공기호부정사용, 사서명위조, 유사수신행위의규제에관한법률위반, 특수공무집행방해치상·폭력행위등처벌에관한법률위반, 특정 경제범죄 가중 처벌등에 관한 법률위반, 공인중개사의업무및부동산거래신고에관한법률위반, 정신보건법위반, 전기통신금융사기피해방지, 피해금환급에관한특별법위반, 항소기각에대한재항고, 학교보건법위반, 폭행치사, 위헌법률심판제청신청, 산림법위반, 컴퓨터프로그램보호법위반, 도주, 정당법위반, 학원의설립·운영및과외교습에관한법률위반, 수질환경보전법위반, 미성년자의제강간, 부정사용공기호행사, 산지관리법위반, 공용물건 손상, 국가기술자격법위반, 도로 교통법 위반, 군인등강제추행, 스토킹범죄의처벌등에관한법률위반, 세무사법위반, 강제추행치상, 손해배상, 항소기각결정에대한재항고, 도박, 허위진단서작성, 주식회사의외부감사에관한법률위반, 강도강간, 폭력행위등처벌에 관한 법률 위반, 퇴거불응, 재심기각결정에대한재항고, 뇌물 공여, 근로기준법 위반, 상관모욕, 특수폭행\n\n    [사용자 사건 개요]\n    중고거래로 30만원을 보냈는데 물건이 오지 않았습니다.\n    ",
+    "role": "user"
+   }
+  ],
+  "model": "gpt-5-mini"
+ },
+ "rag_summary": {
+  "messages": [
+   {
+    "content": "\n    너는 형사 사건 판례 검색 엔진의 결과 요약 봇이야.\n    감정적인 공감이나 서론, 결론, 면책 문구(법적 효력이 없다는 경고 등)를 절대 붙이지 마.\n    사용자가 원하는 포맷에 맞춰서 필요한 정보만 기계적으로 채워.\n    ",
+    "role": "system"
+   },
+   {
+    "content": "\n    [후보 판례]\n    - 사건번호: 2020고단1\n    - 죄목(label): 사기\n    - 사실관계(facts): 사실관계 1\n\n    위 정보를 참고해서, 아래 형식의 JSON만 출력해라.\n\n    {\n      \"case_no\": \"<해당 판례 사건번호 그대로>\",\n      \"label\": \"<해당 판례 label 그대로>\",\n      \"summary\": \"<해당 판례의 사건 요약(1~2문장)>\",\n      \"result\": \"<유죄/무죄 여부 및 적용 죄목, 형량 등 판결 결과 요약>\"\n    }\n\n    주의:\n    - JSON 이외의 텍스트는 출력하지 마라.\n    - 요약은 1~3문장 정도로 간결하게 작성해라.\n    ",
+    "role": "user"
+   }
+  ],
+  "model": "gpt-5-mini"
+ },
+ "rewrite": {
+  "messages": [
+   {
+    "content": "You are a drafting assistant for Korean criminal complaints.\nYou revise a draft by removing statements the user never made.",
+    "role": "system"
+   },
+   {
+    "content": "아래 [초안]에서 [근거 없는 표현]에 적힌 부분만 고치십시오. '문장:'이 함께 적혀 있으면 그 문장 안의 해당 구절입니다.\n- 사용자가 말하지 않은 내용은 지우십시오. 지운 뒤 문장이 어색하면 그 문장만 자연스럽게 다듬으십시오.\n- 사용자가 '모르겠다'고 답한 것을 단정한 서술은 지우거나 '확인하지 못하였습니다'로 바꾸십시오.\n- 새로운 사실, 날짜, 금액, 사람, 감정을 더하지 마십시오.\n- 지적되지 않은 문장은 그대로 두십시오.\n- 처벌을 바란다는 문장과 수사를 요청하는 문장은 지우지 마십시오. 그 문장에 근거 없는 표현이 섞여 있으면 그 표현만 빼십시오.\n- 출력은 [초안]과 같은 형식으로 하십시오: '=== 범죄사실 ===' 과 '=== 고소이유 ===' 두 부분.\n- '[이름1]', '[전화번호1]', '[계좌번호1]', '[주소1]' 같은 표식은 가려 둔 실제 값입니다. 값이 주어진 것으로 보고, 쓸 때는 표식을 한 글자도 바꾸지 말고 그대로 옮기십시오.\n\n[근거 없는 표현]\n- \"피고소인에게\" — 문장: \"고소인은 피고소인에게 금원을 송금하였습니다.\" (대화에 없는 내용)\n\n[초안]\n=== 범죄사실 ===\n○ 고소인은 피고소인에게 금원을 송금하였습니다.\n\n=== 고소이유 ===\n○ 위 사실에 관하여 수사를 요청합니다.\n",
+    "role": "user"
+   }
+  ],
+  "model": "gpt-5-mini"
+ },
+ "verify": {
+  "messages": [
+   {
+    "content": "You check a Korean criminal complaint draft against what the user actually said.",
+    "role": "system"
+   },
+   {
+    "content": "아래 [대화]는 사용자가 사건에 대해 말한 전부이고, [초안]은 그 대화로 쓴 고소장 초안입니다.\n초안에서 대화에 근거가 없는 사실 서술을 모두 찾으십시오.\n\n근거가 없는 것:\n- 사용자가 말하지 않은 감정, 피해의 정도 (예: 정신적 고통, 피해가 극심하다)\n- 사용자가 '모르겠다'고 답했거나 답하지 않은 것을 있다 또는 없다로 단정한 서술\n- 사용자가 말하지 않은 세부: 누가 했는지, 누구의 것인지, 언제, 몇 번, 어떤 방법으로, 요구하거나 거부했는지\n\n근거가 있는 것으로 보는 것:\n- 흩어진 답을 하나로 합친 문장\n- 사용자가 말한 사실을 법률 문장이나 법률 용어로 옮긴 것 (기망, 착오, 처분행위 같은 평가)\n- '모르겠다'고 한 것을 '확인하지 못하였다'고 적은 것\n- 사용자가 말한 사실에서 바로 따라 나오는 사실\n- 처벌을 바란다는 문장, 수사를 요청하는 문장\n\nquote에는 초안에서 근거가 없는 부분만, 한 글자도 바꾸지 말고 그대로 옮기십시오.\n- 문장 가운데 일부만 근거가 없으면 그 구절만 옮기십시오 (예: '두려움을 느껴 요구에 응하여 송금하였다'에서 요구가 있었다는 말이 대화에 없으면 '요구에 응하여').\n- 문장 전체가 근거 없을 때만 문장 전체를 옮기십시오.\n- 한 문장에 근거 없는 구절이 여럿이면 구절마다 따로 적으십시오.\nreason에는 대화의 어느 부분과 맞지 않는지 한 문장으로 적으십시오.\n근거 없는 서술이 없으면 unsupported를 빈 목록으로 두십시오.\n- '[이름1]', '[전화번호1]', '[계좌번호1]', '[주소1]' 같은 표식은 가려 둔 실제 값입니다. 값이 주어진 것으로 보고, 쓸 때는 표식을 한 글자도 바꾸지 말고 그대로 옮기십시오.\n\n[대화]\n사용자: 중고거래로 30만원을 보냈는데 물건이 오지 않았습니다.\n사용자: 위 사건 개요를 기반으로, 이어서 질문을 해 주세요.\n질문: 필수 정보가 충족되었습니다. 고소장을 작성해드릴게요.\n\n[초안]\n=== 범죄사실 ===\n○ 고소인은 피고소인에게 금원을 송금하였습니다.\n\n=== 고소이유 ===\n○ 위 사실에 관하여 수사를 요청합니다.\n",
+    "role": "user"
+   }
+  ],
+  "model": "gpt-5-mini",
+  "response_format": {
+   "json_schema": {
+    "name": "Verification",
+    "schema": {
+     "$defs": {
+      "UnsupportedClaim": {
+       "additionalProperties": false,
+       "properties": {
+        "quote": {
+         "title": "Quote",
+         "type": "string"
+        },
+        "reason": {
+         "title": "Reason",
+         "type": "string"
+        }
+       },
+       "required": [
+        "quote",
+        "reason"
+       ],
+       "title": "UnsupportedClaim",
+       "type": "object"
+      }
+     },
+     "additionalProperties": false,
+     "properties": {
+      "unsupported": {
+       "items": {
+        "$ref": "#/$defs/UnsupportedClaim"
+       },
+       "title": "Unsupported",
+       "type": "array"
+      }
+     },
+     "required": [
+      "unsupported"
+     ],
+     "title": "Verification",
+     "type": "object"
+    },
+    "strict": true
+   },
+   "type": "json_schema"
+  },
+  "stream": false
+ }
+}

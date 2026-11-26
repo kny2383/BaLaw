@@ -9,7 +9,7 @@ from langgraph.types import Command
 from flow.chat_graph import DONE_REPLY, build_chat_graph, route_request, select_question
 from loaders.detail_loader import get_detail_schema
 from loaders.offense_loader import get_offense_meta
-from services.openai_client import StructuredOutputError
+from services.llm import StructuredOutputError
 
 CONFIG = {"configurable": {"thread_id": "t1"}}
 INIT = {"request": {"action": "init", "text": "사건 개요", "offense": "fraud", "offense_selected": True}}
