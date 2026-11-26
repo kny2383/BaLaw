@@ -197,3 +197,35 @@ def test_ai_client_delete_session(monkeypatch):
     with pytest.raises(RuntimeError):
         ai_service.delete_session("broken")
     assert seen == [("DELETE", "/chat/ok"), ("DELETE", "/chat/broken")]
+
+
+# ---------- 고소장 생성: 초안 검증 결과 전달 ----------
+def _generate(client, db_session, user_tokens, monkeypatch, verification):
+    from app.api import complaint as complaint_api
+
+    async def fake_compose(session_id):
+        body = {"offense": "fraud", "title": "사기",
+                "sections": {"criminal_facts": "범죄사실 본문", "accusation_reason": "고소이유 본문"}}
+        if verification is not None:
+            body["verification"] = verification
+        return body
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_compose", fake_compose)
+    # 관할 경찰서 조회는 이 테스트의 대상이 아니다 (테스트 DB에 경찰서 표가 없다).
+    monkeypatch.setattr(complaint_api, "get_police_station_name", lambda address, db: "가상경찰서")
+    cid = create_complaint(client, user_tokens)
+    _with_session(db_session, cid)
+    return client.post(f"/api/complaints/{cid}/generate", headers=auth_header(user_tokens))
+
+
+def test_generate_passes_verification_result_to_the_client(client, db_session, user_tokens, monkeypatch):
+    review = {"status": "unverified", "rewrites": 0, "rechecked": False, "unsupported": [], "removed": []}
+    r = _generate(client, db_session, user_tokens, monkeypatch, review)
+    assert r.status_code == 200
+    assert r.json()["criminal_facts"] == "범죄사실 본문"
+    assert r.json()["verification"]["status"] == "unverified"
+
+
+def test_generate_works_without_verification_field(client, db_session, user_tokens, monkeypatch):
+    r = _generate(client, db_session, user_tokens, monkeypatch, None)
+    assert r.status_code == 200 and r.json()["verification"] is None

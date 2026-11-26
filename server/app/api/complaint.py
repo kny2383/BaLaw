@@ -655,6 +655,11 @@ async def generate_complaint(
             detail=f"AI 서비스 연결 실패: {str(e)}"
         )
 
+    # 초안 검증이 끝나지 않았거나 근거 없는 표현이 남았으면 기록하고 응답으로 알린다 (내용은 기록하지 않는다).
+    verification = ai_response.get("verification")
+    if isinstance(verification, dict) and verification.get("status") in ("unverified", "rewrite_failed", "flagged"):
+        logger.warning("초안 검증이 완료되지 않음 complaint_id=%s status=%s", complaint.id, verification.get("status"))
+
     # 개별 필드에 암호화하여 저장
     complaint.crime_fact = encryption_service.encrypt_field(criminal_facts)
     complaint.complaint_reason = encryption_service.encrypt_field(accusation_reason)
@@ -685,7 +690,8 @@ async def generate_complaint(
         "complaint_id": complaint.id,
         "criminal_facts": criminal_facts,
         "accusation_reason": accusation_reason,
-        "status": "completed"
+        "status": "completed",
+        "verification": verification if isinstance(verification, dict) else None,
     }
 
 @router.get("/{complaint_id}/download")
