@@ -70,6 +70,29 @@ def test_rag_ready_after_init(client):
         assert "사기" in case["label"]
 
 
+def _assert_rag_failed(client, sid):
+    body = client.get(f"/chat/rag/{sid}").json()
+    assert body["rag_status"] == "failed"
+    assert body["rag_keyword"] is None and body["rag_cases"] == []
+    # 판례 검색이 실패해도 대화는 이어진다.
+    assert client.post("/chat/send", json={"session_id": sid, "message": KICKOFF}).status_code == 200
+
+
+def test_rag_failure_at_keyword_is_reported(client, fake):
+    fake.fail_keyword = True
+    _assert_rag_failed(client, _init(client)["session_id"])
+
+
+def test_rag_failure_at_search_is_reported(client, monkeypatch):
+    import services.rag as rag
+
+    def broken():
+        raise RuntimeError("판례 DB를 열 수 없다")
+
+    monkeypatch.setattr(rag, "get_collection", broken)
+    _assert_rag_failed(client, _init(client)["session_id"])
+
+
 def test_rag_unknown_session(client):
     assert client.get("/chat/rag/none").status_code == 404
 
@@ -195,9 +218,8 @@ def test_restore_without_user_message(client):
     assert r.status_code == 400
 
 
-def test_restore_failure_leaves_no_session(client, fake):
-    import baroai
+def test_restore_failure_leaves_no_session(client, fake, session_ids):
     fake.fail_extract = True
     history = [{"role": "user", "content": NARRATIVE}, {"role": "user", "content": "네"}]
     assert client.post("/chat/restore", json={"history": history}).status_code == 502
-    assert baroai.SESSIONS == {}
+    assert session_ids() == []
