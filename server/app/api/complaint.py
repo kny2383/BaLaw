@@ -4,6 +4,7 @@ from sqlalchemy import not_
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
+import logging
 
 from app.database import get_db
 from app.models.user import User
@@ -21,6 +22,8 @@ from app.services.encryption_service import encryption_service
 from app.services.ai_service import ai_service
 from app.services.docx_service import complaint_docx_service
 from app.utils.address_parser import get_police_station_name
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/complaints", tags=["Complaints"])
 
@@ -789,6 +792,18 @@ def delete_complaint(
 
     if not complaint:
         raise HTTPException(status_code=404, detail="고소장을 찾을 수 없습니다")
+
+    # AI 서비스에 남은 대화 상태를 먼저 지운다. 실패하면 고소장을 지우지 않는다.
+    # 고소장만 지우면 세션 ID를 잃어 AI 쪽 대화를 다시는 지울 수 없게 된다.
+    if complaint.ai_session_id:
+        try:
+            ai_service.delete_session(complaint.ai_session_id)
+        except RuntimeError as e:
+            logger.error("고소장 %s 삭제 중단: %s", complaint.id, e)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="대화 기록을 지우지 못해 삭제를 끝내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            )
 
     db.delete(complaint)
     db.commit()
