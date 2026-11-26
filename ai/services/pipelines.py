@@ -125,13 +125,9 @@ def extract_all(user_text: str, offense: str) -> Dict[str, Dict[str, dict]]:
     meta = get_offense_meta(offense)
     prompt = _build_single_prompt(user_text, meta, offense)
     # 출력은 죄목별 스키마로 강제한다. 모든 항목과 슬롯이 빠짐없이 온다.
+    # 실패하면 StructuredOutputError가 올라간다. 빈 결과로 바꿔 진행하지 않는다 (지표 M10).
     out = respond_parsed(settings.OPENAI_CHAT_MODEL, NEUTRAL_SYSTEM, prompt, extraction_model(offense),
                          reasoning_effort=settings.OPENAI_EXTRACT_REASONING_EFFORT)
-    if out is None:
-        # 실패하면 이전과 같이 빈 결과로 진행한다 (모든 항목이 '없음'으로 처리된다).
-        # 실패를 사용자에게 알리는 처리는 별도 변경으로 한다 (지표 M10).
-        print("[EXTRACT] 구조화 출력을 받지 못해 빈 결과로 진행합니다.")
-        return {"elements": {}, "details": {}}
     return out.model_dump()
 
 # ---------- Enforcement (보수적 강제 규칙) ----------

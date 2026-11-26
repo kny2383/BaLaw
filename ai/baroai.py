@@ -16,6 +16,7 @@ from services.pipelines import (
     _user_window,
     compose_complaint
 )
+from services.openai_client import StructuredOutputError
 from services.rag import run_rag_preview, map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
 
@@ -145,8 +146,13 @@ def _send_to_session(session_id: str, message: str) -> dict:
     s["history"].append({"role": "user", "content": message})
     user_text = _user_window(s["history"], max_chars=1800)
 
-    # LLM 호출
-    parsed = extract_all(user_text, offense)
+    # LLM 호출. 실패하면 이번 발화를 기록에서 빼고 오류로 알린다 (다시 보내면 같은 상태에서 이어진다).
+    try:
+        parsed = extract_all(user_text, offense)
+    except StructuredOutputError as e:
+        s["history"].pop()
+        print(f"[EXTRACT] 정보 추출 실패 session={session_id} reason={e}")
+        raise HTTPException(502, "답변을 처리하지 못했습니다. 잠시 후 다시 보내 주세요.")
     elements = enforce_elements(meta, parsed.get("elements", {}), user_text)
     details  = enforce_details(parsed.get("details", {}), offense)
 
