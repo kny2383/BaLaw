@@ -17,7 +17,8 @@ class BaroAIService:
         error_msg = str(error)
         return "세션을 찾을 수 없습니다" in error_msg or "404" in error_msg
 
-    async def chat_init(self, text: str, offense: Optional[str] = None) -> Dict[str, Any]:
+    async def chat_init(self, text: str, offense: Optional[str] = None,
+                        known_pii: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
         """
         Baro-AI 채팅 세션 초기화 (사건개요 기반)
 
@@ -46,6 +47,8 @@ class BaroAIService:
             payload = {"text": text}
             if offense:
                 payload["offense"] = offense
+            if known_pii:
+                payload["known_pii"] = known_pii
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
@@ -151,7 +154,8 @@ class BaroAIService:
         except Exception as e:
             raise RuntimeError(f"예상치 못한 오류: {str(e)}")
 
-    async def chat_restore_session(self, chat_history: List[Dict[str, str]]) -> str:
+    async def chat_restore_session(self, chat_history: List[Dict[str, str]],
+                                   known_pii: Optional[Dict[str, List[str]]] = None) -> str:
         """
         DB에 저장된 채팅 히스토리로 세션 복원
 
@@ -171,7 +175,7 @@ class BaroAIService:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/restore",
-                    json={"history": chat_history}
+                    json={"history": chat_history, **({"known_pii": known_pii} if known_pii else {})}
                 )
                 response.raise_for_status()
                 data = response.json()
