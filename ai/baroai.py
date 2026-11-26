@@ -1,4 +1,4 @@
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import BackgroundTasks, HTTPException, Response
 from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,8 +6,8 @@ from pydantic import BaseModel
 from typing import Literal, Optional
 from cfg import settings
 from flow.chat_graph import build_chat_graph
-from flow.checkpoint import chat_config, delete_session, rag_config
-from flow.rag_graph import build_rag_graph
+from flow.checkpoint import chat_config, delete_session, prune_session, rag_config
+from flow.rag_graph import build_rag_graph, failed_result
 from services.openai_client import StructuredOutputError
 from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
@@ -88,11 +88,11 @@ def _session(session_id: str) -> dict:
 
 def _rag(session_id: str) -> dict:
     """판례 검색 상태. 아직 끝나지 않았으면 pending."""
-    values = RAG_GRAPH.get_state(rag_config(session_id)).values
+    result = RAG_GRAPH.get_state(rag_config(session_id)).values.get("result") or {}
     return {
-        "rag_status": values.get("status", "pending"),
-        "rag_keyword": values.get("keyword") if values.get("status") else None,
-        "rag_cases": (values.get("cases") or []) if values.get("status") else [],
+        "rag_status": result.get("status", "pending"),
+        "rag_keyword": result.get("keyword"),
+        "rag_cases": result.get("cases") or [],
     }
 
 
@@ -122,15 +122,12 @@ def _create_session(session_id: str, text: str, offense: Optional[str] = None) -
 def _load_rag_preview(session_id: str, text: str) -> None:
     config = rag_config(session_id)
     try:
-        RAG_GRAPH.invoke({"text": text}, config)
+        RAG_GRAPH.invoke({"request": {"text": text}}, config)
     except Exception as e:
         # 어느 단계에서 실패했든 마지막 노드의 결과로 실패 상태를 남긴다 (실행을 이어 가지 않는다).
         print(f"[RAG] 판례 검색 실패 session={session_id} reason={type(e).__name__}")
-        RAG_GRAPH.update_state(
-            config,
-            {"status": "failed", "error": str(e), "keyword": None, "cases": []},
-            as_node="summarize_cases",
-        )
+        RAG_GRAPH.update_state(config, failed_result(e), as_node="summarize_cases")
+    prune_session(session_id, rag=True)
 
 
 def _progress_from_session(s: dict) -> dict:
@@ -156,12 +153,13 @@ def _send_to_session(session_id: str, message: str) -> dict:
         print(f"[EXTRACT] 정보 추출 실패 session={session_id} reason={e}")
         raise HTTPException(502, "답변을 처리하지 못했습니다. 잠시 후 다시 보내 주세요.")
 
-    collected = out["collected"]
+    prune_session(session_id)
+    collected, result = out["collected"], out["result"]
     return {
         "session_id": session_id,
-        "reply": out["reply"],
-        "caution": out["caution"],
-        "progress": {"complete": out["complete"], "elements": collected["elements"], "details": collected["details"]},
+        "reply": result["reply"],
+        "caution": result["caution"],
+        "progress": {"complete": result["complete"], "elements": collected["elements"], "details": collected["details"]},
     }
 
 @app.post("/chat/init")
@@ -221,4 +219,12 @@ def chat_compose(req: ComposeRequest):
     state = _session(req.session_id)
     request = {"action": "compose", "offense": _offense_from_rag(req.session_id, state)}
     out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
+    prune_session(req.session_id)
     return out["draft"]
+
+
+@app.delete("/chat/{session_id}", status_code=204)
+def chat_delete(session_id: str):
+    """세션의 대화와 판례 검색 상태를 모두 지운다. 없는 세션이어도 성공으로 답한다."""
+    delete_session(session_id)
+    return Response(status_code=204)

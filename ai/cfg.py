@@ -1,3 +1,4 @@
+import base64
 import os
 
 from dotenv import load_dotenv
@@ -21,6 +22,20 @@ def _reasoning_effort(name: str, default: str) -> str:
     return value
 
 
+def _checkpoint_key(name: str) -> bytes:
+    """체크포인트 암호화 키(base64로 적은 32바이트)를 읽는다. 값이 없으면 빈 바이트."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return b""
+    try:
+        key = base64.b64decode(raw, validate=True)
+    except Exception:
+        raise ValueError(f"{name}: base64로 적은 값이어야 합니다.")
+    if len(key) != 32:
+        raise ValueError(f"{name}: 32바이트 키여야 합니다 (지금 {len(key)}바이트).")
+    return key
+
+
 class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_COMPOSE_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
@@ -28,6 +43,12 @@ class Settings:
     # 정보 추출 호출의 추론 강도. 기본값 low의 근거는 eval/results/extract-low-dev10.md.
     # 지정하지 않던 이전 동작(모델 기본값)과 비교하려면 medium으로 둔다.
     OPENAI_EXTRACT_REASONING_EFFORT: str = _reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
+    # 대화 상태(체크포인트) 저장소. 비우면 메모리에 두고 서비스가 재시작하면 사라진다.
+    # 값을 넣으면 PostgreSQL에 저장하며, 이때 암호화 키가 없으면 서비스가 뜨지 않는다.
+    CHECKPOINT_DB_URL: str = os.getenv("CHECKPOINT_DB_URL", "").strip()
+    CHECKPOINT_AES_KEY: bytes = _checkpoint_key("CHECKPOINT_AES_KEY")
+    # 기본은 세션마다 최신 상태 하나만 남긴다. 단계별 기록을 남기려면 1로 둔다 (가상 사례 분석용).
+    CHECKPOINT_KEEP_HISTORY: bool = os.getenv("CHECKPOINT_KEEP_HISTORY", "").strip() == "1"
     RAG_DB_URL: str = os.getenv("RAG_DB_URL", "")
     REDIS_URL: str = os.getenv("REDIS_URL", "")
     RAG_CASE_CACHE_TTL_SECONDS: int = int(os.getenv("RAG_CASE_CACHE_TTL_SECONDS", "604800"))
