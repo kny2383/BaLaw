@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, "/app")
 
-ELEMENTS, DETAILS = "[사건 요소(JSON)]\n", "[사건 디테일(JSON)]\n"
+ELEMENTS, DETAILS, EVIDENCE = "[사건 요소(JSON)]\n", "[사건 디테일(JSON)]\n", "[증거 메모]\n"
 
 
 def proxy_control(body: dict) -> None:
@@ -58,6 +58,12 @@ def collected_of(call: dict) -> dict:
     return {"elements": elements, "details": details}
 
 
+def evidence_of(call: dict) -> list:
+    text, dec = call["request"]["messages"][-1]["content"], json.JSONDecoder()
+    memo, _ = dec.raw_decode(text[text.rfind(EVIDENCE) + len(EVIDENCE):])
+    return memo
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="src", required=True)
@@ -72,7 +78,18 @@ def main() -> int:
     out_dir = ROOT / "runs" / args.run_id / "cases"
     out_dir.mkdir(parents=True, exist_ok=True)
     proxy_control({"run_id": args.run_id, "case_id": ""})
+    failed: list[str] = []
+    try:
+        run(args, calls, out_dir, failed, get_offense_meta, compose_complaint)
+    finally:
+        proxy_control({"run_id": "", "case_id": ""})  # 중간에 멈춰도 다음 호출이 이 실행 이름으로 기록되지 않게 한다
+    if failed:
+        print(f"실패 {len(failed)}건: {', '.join(failed)}", flush=True)
+        return 1
+    return 0
 
+
+def run(args, calls, out_dir, failed, get_offense_meta, compose_complaint) -> None:
     for f in sorted((ROOT / "runs" / args.src / "cases").glob("*.json")):
         r = json.loads(f.read_text(encoding="utf-8"))
         if (args.only and r["id"] not in args.only) or not r.get("draft") or (out_dir / f.name).exists():
@@ -83,23 +100,30 @@ def main() -> int:
             return difflib.SequenceMatcher(None, (c.get("response_text") or "")[:400], r["draft"][:400]).ratio()
         call = max(calls, key=score)
         if score(call) < 0.5:
-            print(f"{r['id']}: 원래 작성 요청을 찾지 못함, 건너뜀", flush=True)
+            print(f"{r['id']}: 원래 작성 요청을 찾지 못함", flush=True)
+            failed.append(r["id"])
             continue
         proxy_control({"case_id": r["id"]})
         t0 = time.time()
-        new = compose_complaint(meta=get_offense_meta(body["offense"]), collected=collected_of(call), evidence=[])
-        sections = new["sections"]
+        try:
+            # 증거 메모는 원래 요청과 같은 값을 넘긴다 (서비스는 항상 빈 목록을 넘긴다).
+            new = compose_complaint(meta=get_offense_meta(body["offense"]), collected=collected_of(call),
+                                    evidence=evidence_of(call))
+            sections = new["sections"]
+        except Exception as e:
+            print(f"{r['id']}: 작성 실패 ({type(e).__name__})", flush=True)
+            failed.append(r["id"])
+            continue
         draft = "\n\n".join(f"[{k}]\n{v}" for k, v in sections.items() if isinstance(v, str) and v.strip())
         if not draft:
             print(f"{r['id']}: 작성 실패 (빈 결과)", flush=True)
+            failed.append(r["id"])
             continue
         r["judge_before"], r["draft_before"] = r.pop("judge", None), r["draft"]
         r["draft"] = draft
         r["compose"] = {"status": 200, "latency_s": round(time.time() - t0, 1), "body": new}
         (out_dir / f.name).write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"{r['id']}: {len(r['draft_before'])}자 → {len(draft)}자 ({r['compose']['latency_s']}초)", flush=True)
-    proxy_control({"run_id": "", "case_id": ""})
-    return 0
 
 
 if __name__ == "__main__":
