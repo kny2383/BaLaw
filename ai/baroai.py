@@ -245,8 +245,13 @@ def chat_restore(req: ChatRestoreRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(_load_rag_preview, sid, user_messages[0])
 
     last_response = None
-    for message in user_messages[1:]:
-        last_response = _send_to_session(sid, message)
+    try:
+        for message in user_messages[1:]:
+            last_response = _send_to_session(sid, message)
+    except HTTPException:
+        # 복원 중 실패하면 반쯤 만든 세션을 남기지 않는다. 클라이언트는 session_id를 받지 못한다.
+        SESSIONS.pop(sid, None)
+        raise
 
     return {
         "session_id": sid,
