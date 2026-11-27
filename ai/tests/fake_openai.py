@@ -48,6 +48,8 @@ class FakeOpenAI:
         self.item_status = "satisfied"
         self.fail_extract = False     # True면 추출 요청에 400을 돌려준다
         self.keyword = "사기"
+        self.fail_summary = False     # True면 판례 요약 요청에 400을 돌려준다
+        self.summary_text = None      # 판례 요약 응답을 이 글로 바꾼다 (JSON이 아닌 출력 등)
         self.fail_keyword = False     # True면 죄명 키워드 요청에 400을 돌려준다
         self.verify_results: list[list[str]] = []  # 검증 호출마다 차례로 돌려줄 "근거 없는 표현" 목록. 비면 없음
         self.fail_verify = False      # True면 초안 검증 요청에 400을 돌려준다
@@ -99,7 +101,9 @@ class FakeOpenAI:
                     return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
                 content = self.keyword
             else:  # 판례 요약
-                content = json.dumps({"case_no": "2020고단1", "label": "사기",
+                if self.fail_summary:
+                    return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
+                content = self.summary_text if self.summary_text is not None else json.dumps({"case_no": "2020고단1", "label": "사기",
                                       "summary": "요약", "result": "유죄"}, ensure_ascii=False)
         return 200, {
             "id": "fake", "object": "chat.completion", "created": 0, "model": body.get("model", "fake"),

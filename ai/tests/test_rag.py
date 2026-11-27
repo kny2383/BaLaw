@@ -1,4 +1,8 @@
 """판례 검색에서 판례를 고르는 규칙. 벡터 DB는 대역이다."""
+import json
+
+import pytest
+
 import services.rag as rag
 
 
@@ -71,4 +75,61 @@ def test_summary_keeps_the_retrieved_case_number_and_label():
     """LLM이 다른 사건번호나 죄명을 돌려줘도 검색 결과의 값을 쓴다."""
     case = {"case_no": "2020도1", "label": "사기", "summary": "", "facts": "사실"}
     out = rag._normalize_case_summary(case, {"case_no": "9999도9999", "label": "살인", "summary": "요약", "result": "유죄"})
-    assert out == {"case_no": "2020도1", "label": "사기", "summary": "요약", "result": "유죄"}
+    assert out == {"case_no": "2020도1", "label": "사기", "summary": "요약", "result": "유죄", "summarized": True}
+
+
+CASE = {"case_no": "2020도1", "label": "사기", "summary": "", "facts": "피고인은 물건을 보낼 것처럼 속여 돈을 받았다."}
+
+
+@pytest.fixture
+def cache(monkeypatch):
+    """Redis 대신 쓰는 사전."""
+    store: dict = {}
+    monkeypatch.setattr(rag, "cache_get", store.get)
+    monkeypatch.setattr(rag, "cache_set_json", lambda key, value, ttl: store.__setitem__(key, value))
+    return store
+
+
+def test_summary_is_marked_and_stored(fake, cache):
+    out = rag.get_or_create_case_summary(CASE)
+    assert out["summarized"] is True and out["summary"] == "요약" and len(cache) == 1
+    assert rag.get_or_create_case_summary(CASE) == out and len(fake.requests) == 1  # 두 번째는 저장된 것을 쓴다
+
+
+@pytest.mark.parametrize("broken", ["call", "not_json", "no_summary", "not_an_object"])
+def test_failed_summary_is_marked_and_not_stored(fake, cache, broken):
+    """요약을 만들지 못하면 원문 앞부분을 주되 실패라고 알리고, 저장하지 않는다. 다음에는 다시 시도한다."""
+    if broken == "call":
+        fake.fail_summary = True
+    else:
+        fake.summary_text = {"not_json": "요약입니다", "no_summary": '{"result": "유죄"}', "not_an_object": "[1, 2]"}[broken]
+    out = rag.get_or_create_case_summary(CASE)
+    assert out == {"case_no": "2020도1", "label": "사기", "summary": CASE["facts"], "result": rag.NO_RESULT, "summarized": False}
+    assert cache == {}
+    fake.fail_summary, fake.summary_text = False, None
+    assert rag.get_or_create_case_summary(CASE)["summarized"] is True and len(cache) == 1
+
+
+def test_failure_stored_before_this_rule_is_not_served(fake, cache):
+    """예전에는 실패 결과도 저장했다. 그런 항목을 만나면 쓰지 않고 다시 요약한다."""
+    key = rag._case_summary_cache_key(CASE["case_no"])
+    cache[key] = json.dumps({"case_no": "2020도1", "label": "사기", "summary": CASE["facts"][:200], "result": rag.NO_RESULT})
+    out = rag.get_or_create_case_summary(CASE)
+    assert out["summarized"] is True and out["summary"] == "요약"
+    assert json.loads(cache[key])["summarized"] is True
+
+
+def test_summary_without_a_result_is_still_a_summary_and_is_served_from_storage(fake, cache):
+    """요약 글은 왔는데 판결 결과가 빠진 출력은 요약으로 본다. 저장하고, 다음에는 저장된 것을 쓴다."""
+    fake.summary_text = '{"summary": "요약만 있음"}'
+    out = rag.get_or_create_case_summary(CASE)
+    assert out["summarized"] is True and out["summary"] == "요약만 있음" and out["result"] == rag.NO_RESULT
+    assert rag.get_or_create_case_summary(CASE) == out and len(fake.requests) == 1
+
+
+def test_failed_summaries_are_visible_in_the_api_response(client, fake):
+    fake.fail_summary = True
+    sid = client.post("/chat/init", json={"text": "중고거래로 30만원을 보냈는데 물건이 오지 않았습니다.", "offense": "사기"}).json()["session_id"]
+    body = client.get(f"/chat/rag/{sid}").json()
+    assert body["rag_status"] == "ready" and body["rag_cases"]
+    assert all(c["summarized"] is False and c["result"] == rag.NO_RESULT for c in body["rag_cases"])
