@@ -2,13 +2,39 @@
 
 AI 고소장 작성 도우미 서비스. 사용자가 사건을 일상어로 설명하면, 고소장에 필요한 사실관계를 항목별로 정리하고 빠진 정보를 질문으로 보완해 표준 양식의 초안을 만든다.
 
+## 품질 개선 결과
+
+AI 품질을 평가 사례 53건(모두 가상)으로 재고, 문제마다 원인을 찾아 고친 뒤 다시 쟀다. 과정과 숫자의 출처는 [`docs/case-study.md`](docs/case-study.md)에 있다.
+
+| 문제 | 처음 | 지금 |
+|---|---|---|
+| 한 턴 응답 시간 (중앙값) | 37.1초 | 11.4~12.6초 |
+| 초안의 지어낸 사실 | 초안 33건 중 32~33건에 있음 | 10건 중 0~1건, 보류 세트 13건 중 0건 |
+| LLM 요청에 실린 식별정보 원문 | 384건 | 0건 |
+| 미지원 죄목을 지원하는 것처럼 처리 | 100% | 0% |
+| 판례의 주된 죄명이 사건과 맞음 | 23.8% | 71.9% |
+| 답한 항목을 다시 물음 (같은 조건) | 16회 | 5회 |
+| LLM 실패를 정상처럼 돌려줌 | 12개 조합 중 2개 | 0개 |
+
+처음과 지금 사이에 서비스 모델, 판정 모델, 판정 기준이 바뀌었으므로 지어낸 사실의 두 숫자는 같은 자로 잰 것이 아니다. 단계마다 같은 조건으로 잰 전후와 남은 문제는 위 문서에 있다.
+
+| 문서 | 내용 |
+|---|---|
+| [`docs/case-study.md`](docs/case-study.md) | 문제 숫자 → 원인 → 조치 → 결과 숫자 |
+| [`docs/roadmap.md`](docs/roadmap.md) | 할 일과 진행 상황 |
+| [`docs/metrics.md`](docs/metrics.md) | 지표 M1~M12의 정의 |
+| [`docs/decisions/`](docs/decisions/) | 범위, 모델, 대화 흐름 제어에 대한 결정 기록 |
+| [`eval/README.md`](eval/README.md) | 평가 도구와 실행 방법 |
+| [`eval/results/`](eval/results/) | 실행별 결과 |
+
 ## 레포 구조
 
 | 폴더 | 내용 | 원래 레포 |
 |---|---|---|
 | `docs/` | 요구사항, 기획 대 구현 대조표, 품질 지표, 결정 기록 | - |
 | `server/` | 백엔드 API (FastAPI, PostgreSQL) | capston-design-baro/Baro-Server |
-| `ai/` | AI 서비스 (FastAPI, OpenAI, ChromaDB) | capston-design-baro/Baro-AI |
+| `ai/` | AI 서비스 (FastAPI, LangGraph, OpenAI, ChromaDB) | capston-design-baro/Baro-AI |
+| `eval/` | 평가 사례, 평가기, 결과 | - |
 | `web/` | 프론트엔드 (React, Vite) | capston-design-baro/Baro-Front |
 | `deploy/` | 운영 배포 구성 (Docker Compose, GitHub Actions) | capston-design-baro/Baro-Deploy |
 
