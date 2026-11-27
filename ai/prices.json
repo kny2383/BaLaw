@@ -1,12 +1,13 @@
 {
-  "_note": "USD per 1M tokens. as_of는 공급자 가격 페이지에서 이 단가를 마지막으로 확인한 날이다 (2026-11-27 developers.openai.com/api/docs/pricing 표준 등급과 일치. 기존 세 모델의 단가도 이날 다시 확인했고 바뀌지 않았다). 기준선 실행 전에 공급자 가격 페이지에서 다시 확인하고 as_of를 갱신한다. 가격표에 없는 모델은 결과의 models_missing_price에 나온다. 2026-11-27: gpt-6-luna와 gpt-6.1-terra를 가격 문서의 표준 등급(입력 272K 이하)으로 더했다. 이 두 모델은 날짜가 붙은 판본이 없어 별칭 이름 그대로 적는다.",
+  "_note": "USD per 1M tokens. as_of는 공급자 가격 페이지에서 이 단가를 마지막으로 확인한 날이다 (2026-11-27 developers.openai.com/api/docs/pricing 표준 등급과 일치. 기존 세 모델의 단가도 이날 다시 확인했고 바뀌지 않았다). 기준선 실행 전에 공급자 가격 페이지에서 다시 확인하고 as_of를 갱신한다. 가격표에 없는 모델은 결과의 models_missing_price에 나온다. 2026-11-27: gpt-6-luna와 gpt-6.1-terra를 가격 문서의 표준 등급(입력 272K 이하)으로 더했다. gpt-6.1-sol도 같은 날 같은 문서에서 확인해 더했다. 이 세 모델은 날짜가 붙은 판본이 없어 별칭 이름 그대로 적는다.",
   "as_of": "2026-11-27",
   "models": {
     "gpt-5-mini-2025-08-07": {"provider": "openai", "input": 0.25, "cached_input": 0.025, "output": 2.0},
     "gpt-5-2025-08-07": {"provider": "openai", "input": 1.25, "cached_input": 0.125, "output": 10.0},
     "text-embedding-3-small": {"provider": "openai", "input": 0.02, "cached_input": 0.02, "output": 0.0},
     "gpt-6-luna": {"provider": "openai", "input": 0.1, "cached_input": 0.01, "output": 0.5},
-    "gpt-6.1-terra": {"provider": "openai", "input": 1.0, "cached_input": 0.05, "output": 5.0}
+    "gpt-6.1-terra": {"provider": "openai", "input": 1.0, "cached_input": 0.05, "output": 5.0},
+    "gpt-6.1-sol": {"provider": "openai", "input": 2.0, "cached_input": 0.1, "output": 10.0}
   },
   "aliases": {
     "gpt-5-mini": "gpt-5-mini-2025-08-07",
