@@ -176,6 +176,21 @@ def test_unknown_is_released_when_the_user_tells_it_later(fake):
     assert out["collected"][asked["group"]][asked["item"]]["slots"][asked["slot"]] == "present"
 
 
+def test_settled_slots_are_dropped_when_the_offense_form_changes(fake):
+    """죄목 양식이 바뀌면 이전 양식에서 고정한 값과 방금 한 질문을 새 양식에 쓰지 않는다."""
+    from services.pipelines import ASKED_HEADER
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    _send(graph, "이어서 질문해 주세요")
+    fake.slot_value = "present"
+    assert _send(graph, "답했습니다")["resolved"]
+    fake.slot_value = "missing"
+    out = graph.invoke({"request": {"action": "message", "message": "다른 말", "offense": "insult"}}, CONFIG)
+    assert out["offense"] == "insult" and out["resolved"] == {}
+    assert f"\n{ASKED_HEADER}\n" not in _extract_prompt(fake)
+
+
 def test_unsettled_answer_is_not_locked(fake):
     """답을 받았어도 추출이 "없음"이나 "일부"로 보면 고정하지 않는다. 한 번 더 물을 수 있어야 한다."""
     fake.slot_value, fake.item_status = "missing", "missing"

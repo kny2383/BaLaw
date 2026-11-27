@@ -81,8 +81,12 @@ def extract(state: ChatState) -> dict:
 
     # 방금 한 질문이 있으면 그 질문과 이번 답을 짝지어 알려 준다. 사용자의 말만 이어 붙이면 어느 질문의 답인지 알 수 없다.
     asked = state.get("asked") or None
+    kept = state.get("resolved") or {}
+    if offense != state.get("offense"):
+        # 죄목 양식이 바뀌면 항목 구성이 달라진다. 이전 양식에서 한 질문과 고정한 값은 새 양식에 쓰지 않는다.
+        asked, kept = None, {}
     parsed = extract_all(user_text, offense, asked, state["request"]["message"])
-    resolved = _resolve(state.get("resolved") or {}, asked, parsed)
+    resolved = _resolve(kept, asked, parsed)
     _apply_resolved(parsed, resolved)
     elements = enforce_elements(meta, parsed.get("elements", {}), user_text)
     details = enforce_details(parsed.get("details", {}), offense)
