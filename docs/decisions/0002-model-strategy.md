@@ -101,6 +101,7 @@
 **정한 것** (정해지는 대로 더한다):
 
 - 판정 모델: `gpt-6.1-sol` (2026-11-27). 근거는 `eval/results/judge-model-dev10.md`.
+- 초안 작성·검증·재작성: `gpt-6.1-terra` (2026-11-27). 근거는 `eval/results/service-model-dev10.md`. 설정의 기본값은 정보 추출 모델을 정한 뒤 함께 바꾼다.
 
 **달라지는 것**:
 
