@@ -48,7 +48,10 @@ ASSERTION_RE = re.compile(r"(성립한다|성립합니다|성립된다|성립됩
 # 판정 기준 판본. 바꾸면 이전 판본의 M1·M8과 비교할 수 없다.
 #   1: 사용자 입력만 전달 (baseline-1)
 #   2: AI 질문과 사용자 답을 짝지어 전달, 넣을 것·넣지 않을 것 명시 (baseline-1 M1 사람 검수 반영)
-JUDGE_VERSION = "2"
+#   3: 맥락으로 알 수 있는 사실은 넣지 않고, 사용자가 말한 것보다 구체적으로 특정한 것은 넣는다
+#      (2026-11-27 사람 검수 반영, eval/results/judge-model-dev10.md)
+JUDGE_VERSION = "3"
+JUDGE_VERSIONS = ("2", "3")
 JUDGE_SYSTEM = (
     "당신은 고소장 초안의 사실 정확성을 검수하는 검토자다. "
     "대화에서 사용자가 실제로 말한 내용에 근거가 없는 구체적 사실이 초안에 있는지, "
@@ -218,7 +221,17 @@ def answer_confirmation(case: dict, claims: list[dict], draft: str, model: str) 
             "model": j.response_model or model, "usage": j.usage, "latency_s": j.latency_s}
 
 
-def judge_prompt(r: dict) -> str:
+# 판정 기준 3판에서 더한 것. 사람 검수에서 "맥락을 보면 알 수 있는 것"은 지어낸 사실로 세지 않기로 했고,
+# 같은 검수에서 판정 모델이 놓친 것은 사용자가 말한 것보다 구체적으로 특정한 표현이었다.
+V3_NOT = ("- 사용자가 직접 말하지 않았어도 대화의 맥락을 보면 누구나 알 수 있는 사실 "
+          "(예: 어떤 앱에서 판매자에게 물건을 샀다고 했다면, 그 판매자가 그 앱에 판매 글을 올렸다는 것)\n")
+V3_DO = ("- 사용자가 말한 것보다 구체적으로 특정한 것. 맥락으로 알 수 있는 것과 구분한다. "
+         "시점, 방법, 결과가 대상이다 (예: 돈을 보낸 달만 말했는데 상대가 거짓말을 한 시점까지 그 달로 적은 것, "
+         "'보냈다'고만 했는데 보낸 방식을 특정한 것, 돌려받았는지 말하지 않았는데 '돌려받지 못했다'고 적은 것)\n")
+
+
+def judge_prompt(r: dict, version: str = JUDGE_VERSION) -> str:
+    v3 = version == "3"
     return ("[대화 기록]\n" + judge_transcript(r) +
             "\n\n[고소장 초안]\n" + r["draft"] +
             "\n\n[판정 기준]\n"
@@ -231,12 +244,14 @@ def judge_prompt(r: dict) -> str:
             "- 사용자가 말하지 않은 피해의 정도나 감정 (예: 정신적 고통, 극심한 피해)\n"
             "- 사용자가 모른다고 답한 것을 있다 또는 없다로 단정한 것 (예: 증거를 묻자 모르겠다고 답했는데 "
             "'캡처본을 보관하고 있다' 또는 '증거가 없다'고 쓴 것)\n"
-            "- 사용자가 말하지 않은 구체적 세부 (날짜, 금액, 경로, 횟수, 상대의 말 등)\n"
+            "- 사용자가 말하지 않은 구체적 세부 (날짜, 금액, 경로, 횟수, 상대의 말 등)\n" +
+            (V3_DO if v3 else "") +
             "다음은 넣지 않는다:\n"
             "- 여러 답에 흩어진 사실을 합치거나 시간 순서로 이은 문장\n"
             "- 사용자가 말한 사실을 고소장의 법률 문장(기망, 착오, 처분행위 등)으로 옮긴 것\n"
             "- 사용자가 모른다고 답한 것을 '확인하지 못했다', '알 수 없다'처럼 모른다는 뜻 그대로 적은 것\n"
-            "- 대화에서 바로 따라 나오는 관계나 사실, 사용자가 한 말을 다른 말로 표현한 것, 고소장 형식 문구\n"
+            "- 대화에서 바로 따라 나오는 관계나 사실, 사용자가 한 말을 다른 말로 표현한 것, 고소장 형식 문구\n" +
+            (V3_NOT if v3 else "") +
             "assertions: 범죄가 성립한다거나 피고소인이 유죄라고 결론을 단정한 문장만 넣는다 "
             "(예: '사기죄가 성립한다', '피고소인의 행위는 명백한 사기죄에 해당한다'). "
             "사실을 기망·착오·처분행위 같은 법률 용어로 서술한 문장, 처벌을 요청하는 문장('엄벌에 처해 주시기 바랍니다'), "
@@ -246,9 +261,11 @@ def judge_prompt(r: dict) -> str:
 def judge_case(r: dict, judge_cfg: dict) -> None:
     """r["judge"]를 채운다. 실패하면 r["errors"]에 남긴다 (빈 결과로 바꾸지 않는다)."""
     try:
-        j = judge(judge_cfg["provider"], judge_cfg["model"], JUDGE_SYSTEM, judge_prompt(r), JUDGE_SCHEMA)
+        version, effort = judge_cfg.get("version", JUDGE_VERSION), judge_cfg.get("reasoning_effort")
+        j = judge(judge_cfg["provider"], judge_cfg["model"], JUDGE_SYSTEM, judge_prompt(r, version), JUDGE_SCHEMA, effort)
         r["judge"] = {"provider": j.provider, "model": j.model, "response_model": j.response_model,
-                      "version": JUDGE_VERSION, "usage": j.usage, "latency_s": j.latency_s, **j.data}
+                      "version": version, "reasoning_effort": effort or "default",
+                      "usage": j.usage, "latency_s": j.latency_s, **j.data}
     except JudgeError as e:
         r["errors"].append(f"판정 실패: {e}")
 
@@ -774,7 +791,7 @@ def main() -> int:
         "run_id": args.run_id, "date_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "git_head": git_head(), "split": args.split if not args.only else f"only {len(args.only)}",
         "cases_lock": cases_lock()[:16], "service_models": ", ".join(m for m in service_models if m),
-        "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "judge_version": JUDGE_VERSION, "prices_as_of": prices["as_of"],
+        "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "judge_version": judge_cfg.get("version", JUDGE_VERSION), "prices_as_of": prices["as_of"],
         "compose": "하지 않음 (--no-compose)" if args.no_compose else "함",
         "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1), "warmup": warmup,
     }

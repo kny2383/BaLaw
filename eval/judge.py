@@ -53,7 +53,7 @@ def _post_json(url: str, headers: dict, body: dict, timeout: float = 300) -> dic
         raise JudgeError(str(e)) from e
 
 
-def _openai(model: str, system: str, user: str, schema: dict) -> JudgeResult:
+def _openai(model: str, system: str, user: str, schema: dict, reasoning_effort: str | None = None) -> JudgeResult:
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
         raise JudgeError("OPENAI_API_KEY가 없다")
@@ -65,6 +65,8 @@ def _openai(model: str, system: str, user: str, schema: dict) -> JudgeResult:
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "response_format": {"type": "json_schema", "json_schema": {"name": "judgement", "strict": True, "schema": schema}},
+            # 추론 강도를 지정하지 않으면 요청에 넣지 않는다 (모델 기본값).
+            **({"reasoning_effort": reasoning_effort} if reasoning_effort else {}),
         },
     )
     try:
@@ -85,7 +87,8 @@ def _openai(model: str, system: str, user: str, schema: dict) -> JudgeResult:
 PROVIDERS = {"openai": _openai}
 
 
-def judge(provider: str, model: str, system: str, user: str, schema: dict) -> JudgeResult:
+def judge(provider: str, model: str, system: str, user: str, schema: dict,
+          reasoning_effort: str | None = None) -> JudgeResult:
     if provider not in PROVIDERS:
         raise JudgeError(f"아직 구현하지 않은 판정 공급자: {provider} (가능: {sorted(PROVIDERS)})")
-    return PROVIDERS[provider](model, system, user, schema)
+    return PROVIDERS[provider](model, system, user, schema, reasoning_effort)
