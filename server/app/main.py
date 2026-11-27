@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.api import test, auth, complaint
+from app.api import auth, complaint
 from app.models import user, complaint as complaint_model, chat_message  # noqa: F401  create_all에 테이블을 등록하려고 불러온다
 from app.config import settings
 from app.database import engine, Base
@@ -35,7 +35,6 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(test.router)
 app.include_router(auth.router)
 app.include_router(complaint.router)
 
