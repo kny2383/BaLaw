@@ -55,3 +55,19 @@ def test_health_stays_open_and_stats_keeps_its_own_token(client, token, monkeypa
     monkeypatch.setattr(settings, "LLM_STATS_TOKEN", "stats-secret")
     assert client.get("/llm/stats", headers=GOOD).status_code == 404
     assert client.get("/llm/stats", headers={"Authorization": "Bearer stats-secret"}).status_code == 200
+
+
+def test_api_description_is_not_served_when_a_token_is_configured():
+    """/docs, /openapi.json은 앱을 만들 때 정해진다. 토큰을 준 환경에서 서비스를 새로 띄워 확인한다."""
+    import os
+    import subprocess
+    import sys
+
+    code = ("from fastapi.testclient import TestClient; import baroai; c = TestClient(baroai.app); "
+            "print([c.get(p).status_code for p in ('/docs', '/redoc', '/openapi.json', '/')])")
+    def run(token: str) -> str:
+        env = {**os.environ, "BARO_AI_TOKEN": token}
+        return subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120).stdout.strip().splitlines()[-1]
+    assert run("service-secret") == "[404, 404, 404, 200]"
+    assert run("") == "[200, 200, 200, 200]"
+

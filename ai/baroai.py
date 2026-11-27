@@ -39,7 +39,9 @@ def require_service_token(request: Request, authorization: Optional[str] = Heade
         raise HTTPException(401, "인증이 필요합니다.", headers={"WWW-Authenticate": "Bearer"})
 
 
-app = FastAPI(title="BARO-AI: Complaint Draft API", version="0.1.0", dependencies=[Depends(require_service_token)])
+# 토큰을 요구하는 구성에서는 API 설명 주소(/docs, /redoc, /openapi.json)도 내지 않는다.
+_docs = {} if not settings.BARO_AI_TOKEN else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title="BARO-AI: Complaint Draft API", version="0.1.0", dependencies=[Depends(require_service_token)], **_docs)
 
 
 @app.on_event("startup")
