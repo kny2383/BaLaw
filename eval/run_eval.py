@@ -539,6 +539,8 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["M3_needed_skipped"] = asked["skipped"]
     s["M3_unneeded_asked"] = asked["unneeded"]
     s["M3_other_asked"] = asked["other"]
+    # 이미 물은 필수 항목을 다시 물은 수. M12_reasked_total과 같은 값이고, 위 넷과 더하면 물은 항목의 합이 된다.
+    s["M3_reasked"] = asked["reasked"]
 
     # M3, M12
     q = [r["questions"] for r in convo]
