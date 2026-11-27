@@ -48,6 +48,8 @@ def main() -> int:
     ap.add_argument("--concurrency", type=int, default=5)
     ap.add_argument("--judge-provider", default="openai")
     ap.add_argument("--judge-model", default="gpt-6.1-sol")  # 옛 판정과 비교할 때는 gpt-5-2025-08-07을 준다 (2026-12-11 종료)
+    ap.add_argument("--judge-version", default=ev.JUDGE_VERSION, choices=ev.JUDGE_VERSIONS, help="판정 기준 판본")
+    ap.add_argument("--judge-effort", default=None, help="판정 모델의 추론 강도 (비우면 모델 기본값)")
     args = ap.parse_args()
 
     src_dir = ROOT / "runs" / args.src / "cases"
@@ -65,7 +67,8 @@ def main() -> int:
 
     out_dir = ROOT / "runs" / args.run_id / "cases"
     out_dir.mkdir(parents=True, exist_ok=True)
-    cfg = {"provider": args.judge_provider, "model": args.judge_model}
+    cfg = {"provider": args.judge_provider, "model": args.judge_model, "version": args.judge_version,
+           "reasoning_effort": args.judge_effort}
     started = time.time()
     results = []
 
@@ -75,7 +78,8 @@ def main() -> int:
         if done.exists():
             prev = json.loads(done.read_text(encoding="utf-8"))
             j = prev.get("judge", {})
-            if (j.get("version"), j.get("provider"), j.get("model")) == (ev.JUDGE_VERSION, cfg["provider"], cfg["model"]):
+            if (j.get("version"), j.get("provider"), j.get("model"), j.get("reasoning_effort", "default")) == (
+                    cfg["version"], cfg["provider"], cfg["model"], cfg["reasoning_effort"] or "default"):
                 return prev
         r = copy.deepcopy(src)
         r.pop("judge", None)
@@ -100,7 +104,7 @@ def main() -> int:
     meta = {
         "run_id": args.run_id, "rejudged_from": args.src,
         "date_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"), "git_head": ev.git_head(),
-        "cases": len(results), "judge": f"{cfg['provider']}/{cfg['model']}", "judge_version": ev.JUDGE_VERSION,
+        "cases": len(results), "judge": f"{cfg['provider']}/{cfg['model']}", "judge_version": cfg["version"], "judge_effort": cfg["reasoning_effort"] or "default",
         "prices_as_of": prices["as_of"], "wall_min": round((time.time() - started) / 60, 1),
     }
     (ROOT / "runs" / args.run_id / "summary.json").write_text(
