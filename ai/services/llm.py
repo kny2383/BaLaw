@@ -8,7 +8,7 @@
 - 작업별 모델: `LLM_MODEL_<작업>` (예: LLM_MODEL_EXTRACT). 없으면 이전과 같은 기본값이다.
 - 작업별 주소: `LLM_BASE_URL_<작업>`. OpenAI 호환 API를 내는 다른 서버(로컬 모델 등)로 보낼 때 쓴다.
   이때 OpenAI 키는 보내지 않는다. 그 서버의 키가 있으면 `LLM_API_KEY_<작업>`으로 준다.
-- 모든 호출은 같은 형식으로 기록한다: 작업, 모델, 프롬프트 판본, 토큰, 비용, 걸린 시간, 성공 여부.
+- 모든 호출은 같은 형식으로 기록한다: 작업, 세션 표지, 모델, 프롬프트 판본, 토큰, 비용, 걸린 시간, 성공 여부.
   내용은 기록하지 않는다.
 - 실패는 빈 값으로 바꾸지 않고 예외로 올린다 (지표 M10).
 
@@ -23,6 +23,8 @@ import os
 import threading
 import time
 from collections import deque
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Optional, Type
 
@@ -43,6 +45,24 @@ def recent() -> list:
     """최근 호출 기록의 사본. 호출이 진행 중이어도 안전하게 읽는다."""
     with _recent_lock:
         return list(RECENT)
+
+
+_session: ContextVar[Optional[str]] = ContextVar("llm_session", default=None)
+
+
+def session_tag(session_id: str) -> str:
+    """기록에 남기는 세션 표지. 세션 값 자체는 그 세션의 대화를 읽을 수 있는 값이라 로그에 남기지 않는다."""
+    return hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:12]
+
+
+@contextmanager
+def session(session_id: str):
+    """이 안에서 일어난 호출의 기록에 세션 표지를 붙인다. 고소장 한 건의 호출을 묶어 보기 위해서다."""
+    token = _session.set(session_tag(session_id))
+    try:
+        yield
+    finally:
+        _session.reset(token)
 
 
 class LLMCallError(RuntimeError):
@@ -133,7 +153,7 @@ def _record(task: str, started: float, message=None, error: Optional[str] = None
     response_model = (getattr(message, "response_metadata", None) or {}).get("model_name")
     cached = (usage.get("input_token_details") or {}).get("cache_read")
     rec = {
-        "task": task, "provider": provider, "model": name, "response_model": response_model,
+        "task": task, "session": _session.get(), "provider": provider, "model": name, "response_model": response_model,
         "prompt_version": PROMPT_VERSIONS.get(task),
         "input_tokens": usage.get("input_tokens"), "cached_tokens": cached, "output_tokens": usage.get("output_tokens"),
         "reasoning_tokens": (usage.get("output_token_details") or {}).get("reasoning"),

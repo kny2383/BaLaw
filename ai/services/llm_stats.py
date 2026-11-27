@@ -49,11 +49,39 @@ def _group(records: list[dict]) -> dict:
     }
 
 
+def _sessions(records: list[dict]) -> dict:
+    """세션(고소장 한 건) 단위 집계. 세션 표지가 같은 호출을 한 건으로 묶는다.
+
+    비용은 모든 호출의 비용을 아는 세션만으로 낸다. 하나라도 모르는 세션은 수만 센다.
+    기록의 앞뒤가 잘렸거나 아직 진행 중인 세션은 일부 호출만 들어 있다.
+    """
+    by_session: dict = {}
+    for r in records:
+        if r.get("session"):
+            by_session.setdefault(r["session"], []).append(r)
+    costs = [sum(r["cost_usd"] for r in calls) for calls in by_session.values()
+             if all(r.get("cost_usd") is not None for r in calls)]
+    counts = [float(len(calls)) for calls in by_session.values()]
+    return {
+        "count": len(by_session),
+        "calls_without_session": sum(1 for r in records if not r.get("session")),
+        "calls_p50": _percentile(counts, 0.5), "calls_p95": _percentile(counts, 0.95),
+        "cost_usd_mean": round(sum(costs) / len(costs), 6) if costs else None,
+        "cost_usd_p50": _round(_percentile(costs, 0.5)), "cost_usd_p95": _round(_percentile(costs, 0.95)),
+        "sessions_with_unknown_cost": len(by_session) - len(costs),
+    }
+
+
+def _round(value: Optional[float]) -> Optional[float]:
+    return None if value is None else round(value, 6)
+
+
 def summarize(records: Iterable[dict]) -> dict:
-    """전체와 작업별 집계. 작업 안에서 모델이나 프롬프트 판본이 섞였으면 목록에 둘 이상이 나온다."""
+    """전체, 작업별, 세션별 집계. 작업 안에서 모델이나 프롬프트 판본이 섞였으면 목록에 둘 이상이 나온다."""
     records = list(records)
     tasks = sorted({r["task"] for r in records})
-    return {"total": _group(records), "tasks": {t: _group([r for r in records if r["task"] == t]) for t in tasks}}
+    return {"total": _group(records), "tasks": {t: _group([r for r in records if r["task"] == t]) for t in tasks},
+            "sessions": _sessions(records)}
 
 
 def parse_log(lines: Iterable[str]) -> list[dict]:
@@ -79,6 +107,11 @@ def table(summary: dict) -> str:
         rows.append(f"| {name} | {g['calls']} | {g['failed']} | {g['latency_p50_s']} | {g['latency_p95_s']} | {g['input_tokens']} "
                     f"| {g['output_tokens']} | {g['reasoning_tokens']} | {g['cost_usd']} | {g['calls_without_cost']} "
                     f"| {', '.join(g['prompt_versions']) if name != '전체' else ''} |")
+    ss = summary["sessions"]
+    rows.append("")
+    rows.append(f"세션 {ss['count']}건 · 세션당 호출 p50 {ss['calls_p50']} · 세션당 비용(달러) 평균 {ss['cost_usd_mean']}, "
+                f"p50 {ss['cost_usd_p50']}, p95 {ss['cost_usd_p95']} · 비용을 모르는 세션 {ss['sessions_with_unknown_cost']}건 "
+                f"· 세션 표지 없는 호출 {ss['calls_without_session']}건")
     return "\n".join(rows)
 
 

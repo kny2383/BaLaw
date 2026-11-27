@@ -146,25 +146,27 @@ def _create_session(session_id: str, text: str, offense: Optional[str] = None,
     pii_state = pii.new_state(known_pii) if settings.PII_MASKING else {}
     if pii_state:
         text = pii.mask(text, pii_state)
-    return CHAT_GRAPH.invoke(
-        {"request": {
-            "action": "init",
-            "text": text,
-            "offense": selected_offense or "fraud",
-            "offense_selected": bool(selected_offense),
-            "pii": pii_state,
-        }},
-        chat_config(session_id),
-    )
+    with llm.session(session_id):
+        return CHAT_GRAPH.invoke(
+            {"request": {
+                "action": "init",
+                "text": text,
+                "offense": selected_offense or "fraud",
+                "offense_selected": bool(selected_offense),
+                "pii": pii_state,
+            }},
+            chat_config(session_id),
+        )
 
 
 def _load_rag_preview(session_id: str, text: str) -> None:
     config = rag_config(session_id)
     try:
-        RAG_GRAPH.invoke({"request": {"text": text}}, config)
+        with llm.session(session_id):
+            RAG_GRAPH.invoke({"request": {"text": text}}, config)
     except Exception as e:
         # 어느 단계에서 실패했든 마지막 노드의 결과로 실패 상태를 남긴다 (실행을 이어 가지 않는다).
-        print(f"[RAG] 판례 검색 실패 session={session_id} reason={type(e).__name__}")
+        print(f"[RAG] 판례 검색 실패 session={llm.session_tag(session_id)} reason={type(e).__name__}")
         RAG_GRAPH.update_state(config, failed_result(e), as_node="summarize_cases")
     prune_session(session_id, rag=True)
 
@@ -192,9 +194,10 @@ def _send_to_session(session_id: str, message: str) -> dict:
 
     # 추출이 실패하면 그래프는 이번 발화를 저장하지 않는다. 오류로 알리고, 다시 보내면 같은 상태에서 이어진다.
     try:
-        out = CHAT_GRAPH.invoke({"request": request}, chat_config(session_id))
+        with llm.session(session_id):
+            out = CHAT_GRAPH.invoke({"request": request}, chat_config(session_id))
     except StructuredOutputError as e:
-        print(f"[EXTRACT] 정보 추출 실패 session={session_id} reason={e}")
+        print(f"[EXTRACT] 정보 추출 실패 session={llm.session_tag(session_id)} reason={e}")
         raise HTTPException(502, "답변을 처리하지 못했습니다. 잠시 후 다시 보내 주세요.")
 
     prune_session(session_id)
@@ -293,9 +296,10 @@ def chat_compose(req: ComposeRequest):
     # 확인을 기다리던 중에 다시 작성을 요청하면 처음부터 새로 쓴다 (기다리던 확인은 버린다).
     # 작성 호출이 실패하면 그래프는 아무것도 저장하지 않는다. 빈 초안을 돌려주지 않고 오류로 알린다.
     try:
-        out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
+        with llm.session(req.session_id):
+            out = CHAT_GRAPH.invoke({"request": request}, chat_config(req.session_id))
     except LLMCallError as e:
-        print(f"[COMPOSE] 초안 작성 실패 session={req.session_id} reason={e}")
+        print(f"[COMPOSE] 초안 작성 실패 session={llm.session_tag(req.session_id)} reason={e}")
         raise HTTPException(502, "초안을 작성하지 못했습니다. 잠시 후 다시 시도해 주세요.")
     prune_session(req.session_id)
     return _compose_response(req.session_id, out)
@@ -310,7 +314,8 @@ def chat_compose_confirm(req: ComposeConfirmRequest):
     expected = len(claims_to_confirm(state["review"]))
     if len(req.answers) != expected:
         raise HTTPException(400, f"답은 {expected}개여야 합니다.")
-    out = CHAT_GRAPH.invoke(Command(resume=req.answers), chat_config(req.session_id))
+    with llm.session(req.session_id):
+        out = CHAT_GRAPH.invoke(Command(resume=req.answers), chat_config(req.session_id))
     prune_session(req.session_id)
     return _compose_response(req.session_id, out)
 
