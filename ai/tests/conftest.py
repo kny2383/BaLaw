@@ -22,6 +22,7 @@ os.environ["PII_MASKING"] = "1"
 os.environ["DRAFT_CONFIRM"] = "0"
 # 실행 환경에 토큰이 설정돼 있어도 테스트는 토큰 없는 구성에서 시작한다. 필요한 테스트가 직접 넣는다.
 os.environ["BARO_AI_TOKEN"] = ""
+os.environ["MUST_ASK_LIMIT"] = ""  # 실행 환경의 값과 상관없이 기본값(2)에서 시작한다
 os.environ["LLM_STATS_TOKEN"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
