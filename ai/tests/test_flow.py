@@ -158,6 +158,24 @@ def test_answered_slot_stays_settled_when_later_extraction_says_missing(fake, se
     assert out["resolved"][asked["group"]][asked["item"]][asked["slot"]] == settled
 
 
+def test_unknown_is_released_when_the_user_tells_it_later(fake):
+    """모른다고 해서 고정한 항목을 사용자가 나중에 말하면 "있음"으로 바꾼다. 모른다고 한 번 했다고 그 정보를 버리지 않는다."""
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    asked = _send(graph, "이어서 질문해 주세요")["asked"]
+    fake.slot_value = "unknown"
+    out = _send(graph, "잘 모르겠어요")
+    assert out["resolved"][asked["group"]][asked["item"]][asked["slot"]] == "unknown"
+    fake.slot_value = "present"        # 뒤의 발화에서 그 내용을 말했다
+    out = _send(graph, "아 생각났어요. 그건 이렇습니다")
+    assert out["resolved"][asked["group"]][asked["item"]][asked["slot"]] == "present"
+    assert out["collected"][asked["group"]][asked["item"]]["slots"][asked["slot"]] == "present"
+    fake.slot_value = "missing"        # 그 뒤 추출이 "없음"으로 돌려도 "있음"은 풀지 않는다
+    out = _send(graph, "다른 이야기")
+    assert out["collected"][asked["group"]][asked["item"]]["slots"][asked["slot"]] == "present"
+
+
 def test_unsettled_answer_is_not_locked(fake):
     """답을 받았어도 추출이 "없음"이나 "일부"로 보면 고정하지 않는다. 한 번 더 물을 수 있어야 한다."""
     fake.slot_value, fake.item_status = "missing", "missing"
