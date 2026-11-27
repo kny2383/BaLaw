@@ -44,6 +44,8 @@ export type RagCase = {
   summary: string;
   result: string;
   similarity: string;
+  // 요약을 만들었는가. false면 summary는 판례 원문의 앞부분이다.
+  summarized?: boolean;
 };
 
 export type ChatInitResponse = {

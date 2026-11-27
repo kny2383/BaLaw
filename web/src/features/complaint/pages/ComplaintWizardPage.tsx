@@ -606,8 +606,19 @@ const ComplaintWizardPage: React.FC = () => {
                                       {/* 사건 개요 */}
                                       <div className="mb-3">
                                         <p className="text-detail-regular mb-1 text-neutral-400">
-                                          사건 개요
+                                          {c.summarized === false
+                                            ? '판례 원문 (앞부분)'
+                                            : '사건 개요'}
                                         </p>
+                                        {c.summarized === false && (
+                                          <p
+                                            className="text-detail-regular mb-1 text-neutral-500"
+                                            role="status"
+                                          >
+                                            요약을 만들지 못해 판례 원문의 앞부분을 그대로 보여
+                                            드려요.
+                                          </p>
+                                        )}
                                         <p className="text-detail-regular leading-relaxed whitespace-pre-line text-neutral-700">
                                           {c.summary || '요약 정보가 없어요.'}
                                         </p>
