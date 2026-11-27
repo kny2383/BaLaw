@@ -11,7 +11,8 @@ from app.services.auth_service import (
     verify_password,
     create_access_token,
     create_refresh_token,
-    verify_token
+    verify_token,
+    REFRESH,
 )
 from app.services.encryption_service import encryption_service
 from app.config import settings
@@ -116,7 +117,7 @@ def login(
 def refresh_token(token_request: RefreshTokenRequest, db: Session = Depends(get_db)):
     """리프레시 토큰으로 새 액세스 토큰 발급"""
     # 리프레시 토큰 검증
-    token_data = verify_token(token_request.refresh_token)
+    token_data = verify_token(token_request.refresh_token, REFRESH)
 
     if token_data is None or token_data.email is None:
         raise HTTPException(

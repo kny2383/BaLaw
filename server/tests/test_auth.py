@@ -1,5 +1,3 @@
-import pytest
-
 from app.models.user import User
 from tests.conftest import auth_header, login, register
 
@@ -57,7 +55,32 @@ def test_refresh_issues_new_tokens(client, user_tokens):
     assert client.get("/api/auth/me", headers=auth_header(r.json())).status_code == 200
 
 
-@pytest.mark.xfail(strict=True, reason="알려진 결함: 액세스·리프레시 토큰을 구분하지 않아 7일짜리 리프레시 토큰으로 API를 호출할 수 있다 (gap-analysis 참고)")
 def test_refresh_token_cannot_be_used_as_access_token(client, user_tokens):
     r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {user_tokens['refresh_token']}"})
     assert r.status_code == 401
+
+
+def test_access_token_cannot_be_used_to_refresh(client, user_tokens):
+    r = client.post("/api/auth/refresh", json={"refresh_token": user_tokens["access_token"]})
+    assert r.status_code == 401
+
+
+def test_tokens_issued_by_refresh_keep_their_types(client, user_tokens):
+    new = client.post("/api/auth/refresh", json={"refresh_token": user_tokens["refresh_token"]}).json()
+    assert client.get("/api/auth/me", headers=auth_header(new)).status_code == 200
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {new['refresh_token']}"}).status_code == 401
+    assert client.post("/api/auth/refresh", json={"refresh_token": new["refresh_token"]}).status_code == 200
+
+
+def test_token_without_a_type_is_refused(client, user_tokens):
+    """종류가 적히지 않은 토큰(검사를 넣기 전에 발급된 형식)은 서명이 맞아도 받지 않는다."""
+    from datetime import datetime, timedelta
+
+    from jose import jwt
+
+    from app.config import settings
+
+    old = jwt.encode({"sub": "user1@example.com", "exp": datetime.utcnow() + timedelta(minutes=5)},
+                     settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {old}"}).status_code == 401
+    assert client.post("/api/auth/refresh", json={"refresh_token": old}).status_code == 401

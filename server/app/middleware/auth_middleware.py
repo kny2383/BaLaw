@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.services.auth_service import verify_token
+from app.services.auth_service import ACCESS, verify_token
 
 security = HTTPBearer()
 
@@ -16,7 +16,7 @@ def get_current_user(
     token = credentials.credentials
     
     # 토큰 검증
-    token_data = verify_token(token)
+    token_data = verify_token(token, ACCESS)
     
     if token_data is None or token_data.email is None:
         raise HTTPException(
