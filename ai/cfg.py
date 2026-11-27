@@ -88,10 +88,10 @@ class Settings:
     OPENAI_EXTRACT_REASONING_EFFORT: str = _reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
     # 작업별 추론 강도. 지정하지 않은 작업은 요청에 넣지 않는다 (모델 기본값).
     LLM_REASONING_EFFORTS: dict = {"extract": OPENAI_EXTRACT_REASONING_EFFORT}
-    # 같은 필수 항목을 묻는 횟수의 상한. 기본은 1: 한 번 묻고 답을 받은 항목은 다시 묻지 않는다.
-    # 추출이 그 답을 "있음"으로 보지 않아도 다시 묻지 않는다. 사용자는 이미 답했고, 같은 질문이 되풀이되기 때문이다 (지표 M12).
-    # 2로 두면 이전 동작이다 (아직 "없음"이면 한 번 더 묻는다).
-    MUST_ASK_LIMIT: int = _at_least_one("MUST_ASK_LIMIT", 1)
+    # 같은 필수 항목을 묻는 횟수의 상한. 기본은 2: 추출이 아직 "없음"으로 보면 한 번 더 묻는다.
+    # 1로 두면 한 번 묻고 답을 받은 항목은 다시 묻지 않는다. 되묻기는 없어지지만, 사용자가 일부만 답했거나
+    # 엉뚱하게 답한 정보는 빈 채로 남는다. 그 손실을 평가로 재지 못해 기본값으로 쓰지 않는다 (eval/results/ask-once-dev10.md).
+    MUST_ASK_LIMIT: int = _at_least_one("MUST_ASK_LIMIT", 2)
     # 초안을 대화와 대조해 근거 없는 표현을 고쳐 다시 쓰는 횟수의 상한. 0이면 검증하지 않는다.
     DRAFT_MAX_REWRITES: int = int(os.getenv("DRAFT_MAX_REWRITES", "").strip() or "1")
     # 검증이 찾은 표현을 고치기 전에 사용자에게 사실인지 묻는다 (기본 켜짐). 0이면 묻지 않고 고친다.

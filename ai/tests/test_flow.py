@@ -83,23 +83,27 @@ def _ask_until_done(limit: int = 200) -> tuple[list[str], dict]:
     raise AssertionError("대화가 끝나지 않는다")
 
 
-def test_answered_must_slot_is_not_asked_again():
-    """한 번 묻고 답을 받은 필수 항목은, 추출이 그 답을 "있음"으로 보지 않아도 다시 묻지 않는다 (M12)."""
+def test_must_ask_limit_one_never_repeats_a_question(monkeypatch):
+    """상한을 1로 두면 한 번 묻고 답을 받은 필수 항목은, 추출이 그 답을 "있음"으로 보지 않아도 다시 묻지 않는다."""
+    from cfg import settings
+    monkeypatch.setattr(settings, "MUST_ASK_LIMIT", 1)
     asked, collected = _ask_until_done()
     counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
     assert counts and max(counts) == 1
     assert len(asked) == len(counts) == len(set(asked)), "같은 질문이 두 번 나오지 않는다"
 
 
-def test_must_ask_limit_two_restores_the_second_ask(monkeypatch):
+def test_default_asks_a_missing_must_slot_twice(monkeypatch):
+    """기본(상한 2)은 추출이 아직 "없음"으로 보는 필수 항목을 한 번 더 묻는다. 정보를 잃지 않는 쪽이 기본이다."""
     from cfg import settings
-    once, _ = _ask_until_done()
-    monkeypatch.setattr(settings, "MUST_ASK_LIMIT", 2)
+    assert settings.MUST_ASK_LIMIT == 2
     twice, collected = _ask_until_done()
+    monkeypatch.setattr(settings, "MUST_ASK_LIMIT", 1)
+    once, _ = _ask_until_done()
     counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
     assert max(counts) == 2 and len(twice) > len(once)
     assert set(twice) == set(once), "상한은 되묻기만 줄인다. 처음 묻는 항목은 같다"
-    assert len(set(twice)) < len(twice), "상한이 2면 같은 질문이 다시 나온다 (이전 동작)"
+    assert len(set(twice)) < len(twice), "상한이 2면 같은 질문이 다시 나온다"
 
 
 def test_select_question_sets_caution_from_user_messages_only():
