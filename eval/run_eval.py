@@ -231,6 +231,8 @@ V3_DO = ("- 사용자가 말한 것보다 구체적으로 특정한 것. 맥락�
 
 
 def judge_prompt(r: dict, version: str = JUDGE_VERSION) -> str:
+    if version not in JUDGE_VERSIONS:
+        raise ValueError(f"모르는 판정 기준 판본: {version!r} (가능: {JUDGE_VERSIONS})")
     v3 = version == "3"
     return ("[대화 기록]\n" + judge_transcript(r) +
             "\n\n[고소장 초안]\n" + r["draft"] +
