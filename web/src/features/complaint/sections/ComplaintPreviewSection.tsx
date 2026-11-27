@@ -2,9 +2,13 @@ import React from 'react';
 
 import IntroHeader from '@/shared/ui/IntroHeader';
 
+import type { DraftClaim } from '@/features/complaint/apis/complaints';
+
 type ComplaintPreviewSectionProps = {
   complaintId: number;
   content: string;
+  /** 초안을 고쳐 쓰면서 묻지 않고 날짜를 뺀 표현. 맞는 날짜였다면 사용자가 다시 넣을 수 있게 알린다. */
+  dateRemoved?: DraftClaim[];
 };
 
 function renderStyledContent(text: string) {
@@ -65,7 +69,11 @@ function renderStyledContent(text: string) {
 const ComplaintPreviewSection: React.FC<ComplaintPreviewSectionProps> = ({
   complaintId,
   content,
+  dateRemoved = [],
 }) => {
+  // 같은 문장이 범죄사실과 고소이유에서 따로 잡히면 한 번만 보여 준다
+  const removedSentences = Array.from(new Set(dateRemoved.map((c) => c.sentence ?? c.quote)));
+
   return (
     <section
       aria-label={`고소장 미리보기 (ID: ${complaintId})`}
@@ -88,6 +96,25 @@ const ComplaintPreviewSection: React.FC<ComplaintPreviewSectionProps> = ({
         법적 효력을 보장하지 않으니 제출 전 내용을 직접 확인하고, 필요하면 변호사 상담을 받아보시길
         권장해요.
       </p>
+
+      {/* 묻지 않고 날짜를 뺀 표현 알림 */}
+      {removedSentences.length > 0 && (
+        <div
+          role="status"
+          className="border-warning-100 bg-warning-0 rounded-lg border px-4 py-3"
+        >
+          <p className="text-body-3-bold text-neutral-800">날짜를 빼고 적은 내용이 있어요</p>
+          <p className="text-detail-regular mt-1 text-neutral-600">
+            말씀하신 날짜가 아래 일이 있었던 날인지 대화에서 확인되지 않아, 아래 문장은 날짜 없이
+            적었어요. 그 날짜에 있었던 일이 맞다면 내려받은 문서에 직접 넣어 주세요.
+          </p>
+          <ul className="text-detail-regular mt-2 list-disc space-y-1 pl-5 text-neutral-700">
+            {removedSentences.map((s) => (
+              <li key={s}>처음 적었던 문장: {s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* 문서 카드 */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">

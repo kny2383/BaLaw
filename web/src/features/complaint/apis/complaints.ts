@@ -139,7 +139,8 @@ export async function sendChat(complaintId: number, aiSessionId: string, message
 
 /** 초안에서 대화로 확인되지 않은 표현 */
 // quote는 근거가 확인되지 않은 구절, sentence는 그 구절이 들어 있는 초안의 문장이다
-export type DraftClaim = { quote: string; reason?: string; sentence?: string };
+// date_moved는 그 일은 사용자가 말했고 날짜만 다른 일의 것이 붙었던 표현이다. 묻지 않고 날짜를 뺀다
+export type DraftClaim = { quote: string; reason?: string; sentence?: string; date_moved?: boolean };
 
 type GenerateResponse = {
   complaint_id: number;
@@ -147,7 +148,8 @@ type GenerateResponse = {
   accusation_reason: string;
   // awaiting_confirmation이면 초안은 아직 저장되지 않았다. to_confirm에 답해야 완성된다.
   status: 'completed' | 'awaiting_confirmation';
-  verification?: { status: string; to_confirm?: DraftClaim[] } | null;
+  // removed는 고쳐 쓰면서 뺀 표현이다
+  verification?: { status: string; to_confirm?: DraftClaim[]; removed?: DraftClaim[] } | null;
 };
 
 // 위자드에서 쓰기 편하게 가공해서 리턴
@@ -166,6 +168,8 @@ function toGenerateResult(data: GenerateResponse) {
     generated_complaint: `[범죄 사실]\n${data.criminal_facts}\n\n[고소 이유]\n${data.accusation_reason}`,
     // 사용자에게 확인받을 표현. 비어 있으면 완성된 것이다.
     to_confirm: toConfirm,
+    // 묻지 않고 날짜를 뺀 표현. 맞는 날짜였다면 사용자가 다시 넣을 수 있게 미리보기에서 알린다.
+    date_removed: (data.verification?.removed ?? []).filter((c) => c.date_moved === true),
   };
 }
 
