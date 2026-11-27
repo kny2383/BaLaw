@@ -26,6 +26,7 @@ def main() -> int:
     cases = [c for c in ev.load_cases(args.split, args.only) if c["expected_offense"] != "unsupported"]
     out_dir = ev.ROOT / "runs" / args.run_id
     out_dir.mkdir(parents=True, exist_ok=True)
+    ev.use_ai(args.ai_url)
     ev.proxy_control(args.proxy_url, {"run_id": args.run_id, "case_id": "", "fail_rate": 0})
     rows, failed = [], 0
     try:

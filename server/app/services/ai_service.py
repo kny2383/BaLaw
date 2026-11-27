@@ -12,6 +12,15 @@ class BaroAIService:
         self.timeout = 200.0
 
     @staticmethod
+    def _headers() -> Dict[str, str]:
+        """AI 서비스에 보내는 인증 헤더. BARO_AI_TOKEN이 없으면 보내지 않는다.
+
+        AI 서비스의 주소는 세션 값만 알면 대화를 읽고 초안을 만들 수 있다. 서버만 부를 수 있게 같은 토큰을 양쪽에 둔다.
+        """
+        token = settings.BARO_AI_TOKEN.strip()
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
+    @staticmethod
     def is_session_missing_error(error: Exception) -> bool:
         """Baro-AI의 인메모리 세션 유실 여부를 판별한다."""
         error_msg = str(error)
@@ -55,7 +64,7 @@ class BaroAIService:
             if known_pii:
                 payload["known_pii"] = known_pii
 
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, headers=self._headers()) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/init",
                     json=payload
@@ -93,7 +102,7 @@ class BaroAIService:
             }
         """
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, headers=self._headers()) as client:
                 response = await client.get(f"{self.base_url}/chat/rag/{session_id}")
                 response.raise_for_status()
                 return response.json()
@@ -132,7 +141,7 @@ class BaroAIService:
             }
         """
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, headers=self._headers()) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/send",
                     json={
@@ -177,7 +186,7 @@ class BaroAIService:
             raise RuntimeError("사용자 메시지를 찾을 수 없습니다.")
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, headers=self._headers()) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/restore",
                     json={"history": chat_history, **({"known_pii": known_pii} if known_pii else {})}
@@ -231,7 +240,7 @@ class BaroAIService:
 
     async def _post_compose(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, headers=self._headers()) as client:
                 response = await client.post(f"{self.base_url}{path}", json=payload)
                 response.raise_for_status()
                 return response.json()
@@ -258,7 +267,7 @@ class BaroAIService:
         고소장 삭제 요청과 삭제 스케줄러가 함께 쓰도록 동기 함수로 둔다.
         """
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=10.0, headers=self._headers()) as client:
                 response = client.delete(f"{self.base_url}/chat/{session_id}")
                 response.raise_for_status()
         except httpx.HTTPStatusError as e:

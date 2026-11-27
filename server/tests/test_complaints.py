@@ -518,3 +518,47 @@ def test_migration_encrypts_rows_stored_before_and_can_be_rerun(client, db_sessi
     assert migration.decrypt_rows(db_session.connection()) == 4
     db_session.commit()
     assert [r.content for r in _raw_chat_rows(db_session)] == [NARRATIVE, KICKOFF, QUESTION, ANSWER]
+
+
+def _ai_calls_with_token(monkeypatch, token: str) -> list:
+    """AI 서비스로 가는 호출 여섯 종류를 모두 부르고, 요청마다 (경로, Authorization 헤더)를 모은다."""
+    import asyncio
+
+    import httpx
+
+    from app.config import settings
+    from app.services.ai_service import BaroAIService
+
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path, request.headers.get("authorization")))
+        return httpx.Response(200, json={"session_id": "sid"})
+
+    transport = httpx.MockTransport(handler)
+    real_async, real_sync = httpx.AsyncClient, httpx.Client
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real_async(transport=transport, **kw))
+    monkeypatch.setattr(httpx, "Client", lambda **kw: real_sync(transport=transport, **kw))
+    monkeypatch.setattr(settings, "BARO_AI_TOKEN", token)
+    service = BaroAIService()
+    asyncio.run(service.chat_init("서술", "fraud"))
+    asyncio.run(service.get_chat_rag("sid"))
+    asyncio.run(service.chat_send("sid", "답"))
+    asyncio.run(service.chat_restore_session([{"role": "user", "content": "서술"}]))
+    asyncio.run(service.chat_compose("sid"))
+    asyncio.run(service.chat_compose_confirm("sid", [True]))
+    service.delete_session("sid")
+    return seen
+
+
+def test_every_ai_call_carries_the_service_token(monkeypatch):
+    seen = _ai_calls_with_token(monkeypatch, "service-secret")
+    assert [(m, p) for m, p, _ in seen] == [
+        ("POST", "/chat/init"), ("GET", "/chat/rag/sid"), ("POST", "/chat/send"), ("POST", "/chat/restore"),
+        ("POST", "/chat/compose"), ("POST", "/chat/compose/confirm"), ("DELETE", "/chat/sid")]
+    assert {auth for _, _, auth in seen} == {"Bearer service-secret"}
+
+
+def test_no_auth_header_is_sent_without_a_token(monkeypatch):
+    assert {auth for _, _, auth in _ai_calls_with_token(monkeypatch, "  ")} == {None}
+
