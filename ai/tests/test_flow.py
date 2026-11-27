@@ -98,6 +98,7 @@ def test_must_ask_limit_two_restores_the_second_ask(monkeypatch):
     twice, collected = _ask_until_done()
     counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
     assert max(counts) == 2 and len(twice) > len(once)
+    assert set(twice) == set(once), "상한은 되묻기만 줄인다. 처음 묻는 항목은 같다"
     assert len(set(twice)) < len(twice), "상한이 2면 같은 질문이 다시 나온다 (이전 동작)"
 
 
