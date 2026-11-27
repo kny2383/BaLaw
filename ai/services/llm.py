@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 import time
 from collections import deque
 from pathlib import Path
@@ -33,8 +34,15 @@ from cfg import settings
 
 TASKS = ("extract", "compose", "verify", "rewrite", "rag_keyword", "rag_summary")
 
-# 최근 호출 기록 (테스트와 점검용). 내용 없이 수치만 담는다.
-RECENT: deque = deque(maxlen=200)
+# 최근 호출 기록. 내용 없이 수치만 담는다. 서비스가 재시작하면 비고, 그 전 기록은 로그에 남아 있다.
+RECENT: deque = deque(maxlen=5000)
+_recent_lock = threading.Lock()
+
+
+def recent() -> list:
+    """최근 호출 기록의 사본. 호출이 진행 중이어도 안전하게 읽는다."""
+    with _recent_lock:
+        return list(RECENT)
 
 
 class LLMCallError(RuntimeError):
@@ -132,7 +140,8 @@ def _record(task: str, started: float, message=None, error: Optional[str] = None
         "cost_usd": cost_usd(task, response_model or name, usage.get("input_tokens"), cached, usage.get("output_tokens")),
         "latency_s": round(time.time() - started, 3), "ok": error is None, "error": error,
     }
-    RECENT.append(rec)
+    with _recent_lock:
+        RECENT.append(rec)
     print("[LLM] " + json.dumps(rec, ensure_ascii=False))
 
 
