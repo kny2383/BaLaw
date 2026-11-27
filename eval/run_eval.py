@@ -706,7 +706,8 @@ def main() -> int:
     ap.add_argument("--ai-url", default="http://localhost:8001")
     ap.add_argument("--proxy-url", default="http://localhost:8090")
     ap.add_argument("--judge-provider", default=os.environ.get("EVAL_JUDGE_PROVIDER", "openai"))
-    ap.add_argument("--judge-model", default=os.environ.get("EVAL_JUDGE_MODEL", "gpt-5-2025-08-07"))
+    # 2026-11-27에 gpt-5(2026-12-11 종료)에서 옮겼다. 근거: eval/results/judge-model-dev10.md
+    ap.add_argument("--judge-model", default=os.environ.get("EVAL_JUDGE_MODEL", "gpt-6.1-sol"))
     ap.add_argument("--confirm-model", default=os.environ.get("EVAL_CONFIRM_MODEL", "gpt-5-mini"),
                     help="서비스가 사용자 확인을 기다릴 때 모의 사용자의 답을 만드는 모델")
     ap.add_argument("--flush-cache", action="store_true", help="실행 전 Redis 판례 요약 캐시를 비운다")
