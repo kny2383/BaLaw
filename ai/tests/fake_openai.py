@@ -79,8 +79,10 @@ class FakeOpenAI:
             if self.fail_verify:
                 return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}
             quotes = self.verify_results.pop(0) if self.verify_results else []
-            content = json.dumps({"unsupported": [{"quote": q, "reason": "대화에 없는 내용"} for q in quotes]},
-                                 ensure_ascii=False)
+            # 표현은 글자 또는 (글자, 날짜만 붙은 것인가) 쌍으로 준다.
+            claims = [{"quote": q, "reason": "대화에 없는 내용", "date_moved": False} if isinstance(q, str)
+                      else {"quote": q[0], "reason": "다른 일의 날짜", "date_moved": bool(q[1])} for q in quotes]
+            content = json.dumps({"unsupported": claims}, ensure_ascii=False)
         elif rf.get("type") == "json_schema":
             if self.fail_extract:
                 return 400, {"error": {"message": "fake failure", "type": "invalid_request_error"}}

@@ -20,7 +20,12 @@ VERIFY_RULES = (
     "근거가 없는 것:\n"
     "- 사용자가 말하지 않은 감정, 피해의 정도 (예: 정신적 고통, 피해가 극심하다)\n"
     "- 사용자가 '모르겠다'고 답했거나 답하지 않은 것을 있다 또는 없다로 단정한 서술\n"
-    "- 사용자가 말하지 않은 세부: 누가 했는지, 누구의 것인지, 언제, 몇 번, 어떤 방법으로, 요구하거나 거부했는지\n\n"
+    "- 사용자가 말하지 않은 세부: 누가 했는지, 누구의 것인지, 언제, 몇 번, 어떤 방법으로, 요구하거나 거부했는지\n"
+    "- 사용자가 어떤 일의 날짜로 말한 날짜를 다른 일에 붙인 서술. 날짜마다 사용자가 그때 무슨 일이 있었다고 했는지 대화에서 확인하고, "
+    "초안이 그 날짜를 사용자가 말하지 않은 다른 일(계약, 송금, 상대의 말, 서류를 보여 준 일)의 날짜로 적었으면 "
+    "날짜와 그 일을 함께 옮기십시오. 한 문장에서 날짜 하나가 여러 일에 걸려 있으면 사용자가 그 날짜로 말하지 않은 일의 구절만 옮기십시오 "
+    "(예: 사용자가 물건을 본 날만 말했는데 초안이 '2026. 3. 2. 물건을 보고 대금을 송금하였습니다'라고 적었으면 '대금을 송금하였습니다'). "
+    "사용자가 사건 전체의 날짜로 말한 날짜를 사건의 날짜로 적은 것은 근거가 있습니다.\n\n"
     "근거가 있는 것으로 보는 것:\n"
     "- 흩어진 답을 하나로 합친 문장\n"
     "- 사용자가 말한 사실을 법률 문장이나 법률 용어로 옮긴 것 (기망, 착오, 처분행위 같은 평가)\n"
@@ -33,6 +38,7 @@ VERIFY_RULES = (
     "- 문장 전체가 근거 없을 때만 문장 전체를 옮기십시오.\n"
     "- 한 문장에 근거 없는 구절이 여럿이면 구절마다 따로 적으십시오.\n"
     "reason에는 대화의 어느 부분과 맞지 않는지 한 문장으로 적으십시오.\n"
+    "date_moved는 그 일 자체는 사용자가 말했고 날짜만 다른 일의 것이 붙은 경우에 true, 그 밖에는 false로 두십시오.\n"
     "근거 없는 서술이 없으면 unsupported를 빈 목록으로 두십시오.\n"
     + PII_NOTE
 )
@@ -46,6 +52,8 @@ REWRITE_RULES = (
     "아래 [초안]에서 [근거 없는 표현]에 적힌 부분만 고치십시오. '문장:'이 함께 적혀 있으면 그 문장 안의 해당 구절입니다.\n"
     "- 사용자가 말하지 않은 내용은 지우십시오. 지운 뒤 문장이 어색하면 그 문장만 자연스럽게 다듬으십시오.\n"
     "- 사용자가 '모르겠다'고 답한 것을 단정한 서술은 지우거나 '확인하지 못하였습니다'로 바꾸십시오.\n"
+    "- '(날짜만 뗌)'이라고 적힌 표현은 그 일을 지우지 말고, 날짜가 그 일에 걸리지 않도록 문장을 나누거나 날짜를 빼십시오. "
+    "사용자가 그 날짜로 말한 일에는 날짜를 남기십시오.\n"
     "- 새로운 사실, 날짜, 금액, 사람, 감정을 더하지 마십시오.\n"
     "- 지적되지 않은 문장은 그대로 두십시오.\n"
     "- 처벌을 바란다는 문장과 수사를 요청하는 문장은 지우지 마십시오. 그 문장에 근거 없는 표현이 섞여 있으면 그 표현만 빼십시오.\n"
@@ -86,7 +94,8 @@ def verify_draft(history: list[dict], sections: dict) -> list[dict]:
         # 글머리표는 문장의 일부가 아니다. 떼어 내야 문장 안에서 구절의 자리를 찾을 수 있다.
         quote = c.quote.strip().lstrip("○").strip()
         if quote and quote in draft_text:
-            found.append({"quote": quote, "reason": c.reason, "sentence": sentence_of(quote, draft_text)})
+            found.append({"quote": quote, "reason": c.reason, "sentence": sentence_of(quote, draft_text),
+                          "date_moved": c.date_moved})
     dropped = len(out.unsupported) - len(found)
     if dropped:
         print(f"[VERIFY] 초안에서 찾지 못한 인용 {dropped}개를 버림")
@@ -97,7 +106,8 @@ def _listed(claim: dict) -> str:
     """재작성에 넘기는 한 줄. 구절이 짧으면 어느 문장의 것인지 함께 적는다."""
     sentence = claim.get("sentence") or claim["quote"]
     where = "" if sentence == claim["quote"] else f" — 문장: \"{sentence}\""
-    return f"- \"{claim['quote']}\"{where} ({claim['reason']})"
+    how = " (날짜만 뗌)" if claim.get("date_moved") else ""
+    return f"- \"{claim['quote']}\"{where}{how} ({claim['reason']})"
 
 
 def rewrite_draft(sections: dict, unsupported: list[dict]) -> dict | None:
