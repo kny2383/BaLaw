@@ -1,8 +1,9 @@
 """서비스가 LLM에 보내는 요청 본문을 호출 종류별로 모은다.
 
 호출 계층을 바꾸는 구조 변경에서 "요청이 이전과 같다"를 확인하는 기준이다.
-기준 파일을 다시 만들 때:  python -m tests.snapshot_llm_requests tests/fixtures/llm_requests.json
-이때 죄목별 기준 파일(같은 폴더)과 작업별 프롬프트 판본(prompt_versions.json)도 함께 다시 만든다.
+기준 파일을 다시 만들 때:  python -m tests.snapshot_llm_requests
+비교용으로 다른 곳에 만들 때:  python -m tests.snapshot_llm_requests <폴더>  (기준 파일과 판본을 건드리지 않는다)
+죄목별 기준 파일과 작업별 프롬프트 판본(prompt_versions.json)을 한 번에 만든다.
 어느 죄목의 프롬프트나 출력 형식을 바꿔도 판본이 바뀐다.
 """
 from __future__ import annotations
@@ -65,13 +66,20 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    client, directory, by_offense = TestClient(baroai.app), Path(sys.argv[1]).parent, []
+    # 인자 없이 부르면 기준 파일(tests/fixtures)과 판본(prompt_versions.json)을 함께 다시 만든다.
+    # 폴더를 주면 그 폴더에만 쓴다 (비교용). 이때 실제 판본 파일은 건드리지 않아 기준 파일과 어긋나지 않는다.
+    fixtures = Path(__file__).resolve().parent / "fixtures"
+    directory = Path(sys.argv[1]) if len(sys.argv) > 1 else fixtures
+    if not directory.is_dir():
+        raise SystemExit(f"폴더가 아닙니다: {directory}")
+    client, by_offense = TestClient(baroai.app), []
     for name, offense, text in OFFENSES:
         data = collect(client, c._fake, offense, text)
         (directory / name).write_text(json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         by_offense.append(data)
     import services.llm as llm
     versions = versions_of(by_offense)
-    (Path(llm.__file__).resolve().parent.parent / "prompt_versions.json").write_text(
+    target = Path(llm.__file__).resolve().parent.parent if directory.resolve() == fixtures else directory
+    (target / "prompt_versions.json").write_text(
         json.dumps(versions, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    print("저장:", directory, versions)
+    print("저장:", directory, target / "prompt_versions.json", versions)
