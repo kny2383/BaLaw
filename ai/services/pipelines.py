@@ -87,7 +87,18 @@ def _lines_for_details(offense: str) -> List[str]:
     return lines
 
 
-def _build_single_prompt(user_text: str, meta, offense: str) -> str:
+# 방금 한 질문과 그 답을 추출에 알려 줄 때 붙이는 제목. 사용자의 말만 이어 붙이면 어느 질문의 답인지 알 수 없다.
+ASKED_HEADER = "[방금 한 질문과 답]"
+
+
+def _asked_section(asked: Optional[dict], answer: str) -> str:
+    if not asked:
+        return ""
+    return (f"\n\n{ASKED_HEADER}\n질문한 슬롯: {asked['item']}.{asked['slot']}\n"
+            f"질문: {asked['question']}\n답: {answer}")
+
+
+def _build_single_prompt(user_text: str, meta, offense: str, asked: Optional[dict] = None, answer: str = "") -> str:
     elines = "\n".join(_lines_for_elements(meta))
     dlines = "\n".join(_lines_for_details(offense))
     return (
@@ -98,6 +109,10 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
         "- '쯤/경/대략', '확실하지 않다' 등의 표현이 섞여 있더라도, 해당 항목에 필요한 구체적인 데이터가 제공되었다면 'present'로 인정하세요.\n"
         "- 단, 주의하세요! '시간(예: 6시 15분)'만 있고 '정확한 날짜(예: 몇 월 몇 일)'는 없는 경우처럼, 해당 슬롯이 요구하는 **핵심 정보가 누락된 경우에는 통과시키지 말고 반드시 'missing'으로 표기**하여 재질문을 유도하십시오.\n"
         "- 구체적인 데이터 없이 오직 '모른다', '없다'고 명확히 거절/답변한 항목은 **반드시 'unknown'**으로 기재하십시오.\n"
+        f"- {ASKED_HEADER}이 있으면 그 답은 그 질문에 대한 답입니다. 답이 질문이 묻는 내용을 담고 있으면, "
+        "'때문에'나 '이유는' 같은 말이 없어도 그 슬롯을 'present'로 표기하세요.\n"
+        "- 그 답이 질문의 일부에만 답했으면 그 슬롯을 'unclear'로 표기하고, summary에 확인된 것과 아직 빠진 것을 적으세요.\n"
+        "- 그 답이 질문과 상관없는 내용이면 그 슬롯은 'missing'으로 두세요.\n"
         "- 'summary'는 단순히 사용자의 말을 앵무새처럼 요약하는 필드가 아닙니다! 해당 항목에서 어떤 정보는 확인되었고, 반대로 '어떤 정보가 아직 비어있어서(missing) 이 추가 질문을 던지는 것인지' 그 이유(명분)를 상담원처럼 부드럽게 간략한 1문장으로 짚어주세요.\n"
         "- 각 항목의 status는 'satisfied|missing|unclear'\n"
         "- 각 항목의 slots 값은 'present|missing|unclear|unknown' 중 하나만 사용할 것.\n"
@@ -123,13 +138,14 @@ def _build_single_prompt(user_text: str, meta, offense: str) -> str:
         "}\n\n"
         "[elements]\n" + elines + "\n\n" +
         "[details]\n" + dlines + "\n\n" +
-        "[사용자 서술]\n" + user_text
+        "[사용자 서술]\n" + user_text + _asked_section(asked, answer)
     )
 
 
-def extract_all(user_text: str, offense: str) -> Dict[str, Dict[str, dict]]:
+def extract_all(user_text: str, offense: str, asked: Optional[dict] = None, answer: str = "") -> Dict[str, Dict[str, dict]]:
+    """사용자의 말에서 항목별 수집 상태를 판정한다. asked는 방금 한 질문, answer는 그 답이다."""
     meta = get_offense_meta(offense)
-    prompt = _build_single_prompt(user_text, meta, offense)
+    prompt = _build_single_prompt(user_text, meta, offense, asked, answer)
     # 출력은 죄목별 스키마로 강제한다. 모든 항목과 슬롯이 빠짐없이 온다.
     # 실패하면 StructuredOutputError가 올라간다. 빈 결과로 바꿔 진행하지 않는다 (지표 M10).
     out = llm.parsed("extract", NEUTRAL_SYSTEM, prompt, extraction_model(offense))
@@ -210,6 +226,19 @@ def _user_window(history: list[dict], max_chars: int = 2500) -> str:
         print(f"[EXTRACT] 대화가 길어 가운데 발화 {dropped}개를 추출에서 뺌")
     return "\n".join([first] + list(reversed(recent)))
 
+# 같은 항목을 두 번째로 물을 때 덧붙이는 말. 처음과 같은 문장을 되풀이하지 않고, 위의 이유 문장(확인된 것과 빠진 것)에 이어
+# 빠진 것만 묻는다. 모른다고 답할 수 있다는 것도 알린다.
+REASK_LINE = "앞에서 답해 주신 내용으로는 이 부분이 아직 확인되지 않았습니다. 빠진 내용만 알려 주세요. 모르시면 '모른다'고 답하셔도 됩니다."
+
+
+def _ask(question: str, label: str, rec: Dict[str, Any], count: int) -> str:
+    """질문 문장. 처음이면 정해 둔 질문을, 다시 묻는 것이면 빠진 것만 묻는 문구를 쓴다."""
+    if count == 0:
+        return _question_with_reason(question, label, rec)
+    first_line = question.strip().splitlines()[0] if question.strip() else ""
+    return _question_with_reason(f"{REASK_LINE}\n(처음 질문: {first_line})", label, rec)
+
+
 def pick_detail_followup(details: Dict[str, dict], offense: str) -> Optional[str]:
     for spec in get_detail_schema(offense):
         detail_id = spec["id"]
@@ -226,7 +255,7 @@ def pick_detail_followup(details: Dict[str, dict], offense: str) -> Optional[str
                 if count < settings.MUST_ASK_LIMIT:
                     _increment_ask_count(details, detail_id, s)
                     question = spec["questions"].get(s) or f"{spec['label']}의 '{s}' 정보를 알려주세요."
-                    return _question_with_reason(question, spec["label"], rec)
+                    return _ask(question, spec["label"], rec, count)
                 else:
                     continue
 
@@ -279,9 +308,9 @@ def pick_element_followup(elements: Dict[str, dict], meta) -> Optional[str]:
                     _increment_ask_count(elements, element_id, slot_name)
                     for q in getattr(e, "questions", []) or []:
                         if getattr(q, "slot", None) == slot_name:
-                            return _question_with_reason(q.text, e.label, rec)
+                            return _ask(q.text, e.label, rec, count)
                     fallback = f"{e.label}의 '{slot_name}' 정보를 알려주세요."
-                    return _question_with_reason(fallback, e.label, rec)
+                    return _ask(fallback, e.label, rec, count)
                 else:
                     continue
 

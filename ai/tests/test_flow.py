@@ -93,17 +93,112 @@ def test_must_ask_limit_one_never_repeats_a_question(monkeypatch):
     assert len(asked) == len(counts) == len(set(asked)), "같은 질문이 두 번 나오지 않는다"
 
 
-def test_default_asks_a_missing_must_slot_twice(monkeypatch):
-    """기본(상한 2)은 추출이 아직 "없음"으로 보는 필수 항목을 한 번 더 묻는다. 정보를 잃지 않는 쪽이 기본이다."""
+def test_default_asks_a_missing_must_slot_once_more_in_other_words(monkeypatch):
+    """기본(상한 2)은 추출이 아직 "없음"으로 보는 필수 항목을 한 번 더 묻는다. 정보를 잃지 않는 쪽이 기본이다.
+
+    두 번째는 처음과 같은 문장을 되풀이하지 않는다. 빠진 것만 묻고, 모른다고 답할 수 있다고 알린다.
+    """
     from cfg import settings
+    from services.pipelines import REASK_LINE
     assert settings.MUST_ASK_LIMIT == 2
     twice, collected = _ask_until_done()
+    counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
+    assert max(counts) == 2, "세 번째는 없다"
+    again = [q for q in twice if REASK_LINE in q]
+    first = [q for q in twice if REASK_LINE not in q]
+    assert again and len(set(twice)) == len(twice), "같은 문장이 두 번 나오지 않는다"
+    assert all("처음 질문:" in q and "모른다" in q for q in again)
     monkeypatch.setattr(settings, "MUST_ASK_LIMIT", 1)
     once, _ = _ask_until_done()
-    counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
-    assert max(counts) == 2 and len(twice) > len(once)
-    assert set(twice) == set(once), "상한은 되묻기만 줄인다. 처음 묻는 항목은 같다"
-    assert len(set(twice)) < len(twice), "상한이 2면 같은 질문이 다시 나온다"
+    assert set(first) == set(once), "상한은 되묻기만 줄인다. 처음 묻는 항목은 같다"
+
+
+def _send(graph, message: str) -> dict:
+    return graph.invoke({"request": {"action": "message", "message": message}}, CONFIG)
+
+
+def _extract_prompt(fake) -> str:
+    body = [r["body"] for r in fake.requests if "response_format" in r["body"]][-1]
+    return body["messages"][-1]["content"]
+
+
+def test_extraction_is_told_which_question_the_answer_belongs_to(fake):
+    """사용자의 말만 이어 붙이면 어느 질문의 답인지 알 수 없다. 방금 한 질문과 이번 답을 짝지어 알려 준다."""
+    from services.pipelines import ASKED_HEADER
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    first = _send(graph, "이어서 질문해 주세요")
+    assert f"\n{ASKED_HEADER}\n" not in _extract_prompt(fake), "아직 물은 것이 없으면 붙이지 않는다"
+    asked = first["asked"]
+    assert asked["question"] == first["result"]["reply"] and asked["slot"]
+    _send(graph, "신분증 사본을 보여 줬습니다")
+    section = _extract_prompt(fake).split(f"\n{ASKED_HEADER}\n")[1]
+    assert f"질문한 슬롯: {asked['item']}.{asked['slot']}" in section
+    assert asked["question"] in section and section.rstrip().endswith("답: 신분증 사본을 보여 줬습니다")
+
+
+@pytest.mark.parametrize("settled", ["present", "unknown"])
+def test_answered_slot_stays_settled_when_later_extraction_says_missing(fake, settled):
+    """묻고 답을 받아 정해진 항목은, 다음 턴의 추출이 "없음"으로 돌려도 그대로 두고 다시 묻지 않는다."""
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    asked = _send(graph, "이어서 질문해 주세요")["asked"]
+    fake.slot_value = settled          # 이번 답으로 물은 슬롯이 정해진다 (가짜 서버는 모든 슬롯에 같은 값을 준다)
+    _send(graph, "답했습니다")
+    fake.slot_value = "missing"        # 다음 턴의 추출은 전부 "없음"이라고 한다
+    for _ in range(60):
+        out = _send(graph, "답했습니다")
+        if out["result"]["complete"]:
+            break
+    rec = out["collected"][asked["group"]][asked["item"]]
+    assert rec["slots"][asked["slot"]] == settled
+    assert rec["_asked_count"][asked["slot"]] == 1
+    assert out["resolved"][asked["group"]][asked["item"]][asked["slot"]] == settled
+
+
+def test_unknown_is_released_when_the_user_tells_it_later(fake):
+    """모른다고 해서 고정한 항목을 사용자가 나중에 말하면 "있음"으로 바꾼다. 모른다고 한 번 했다고 그 정보를 버리지 않는다."""
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    asked = _send(graph, "이어서 질문해 주세요")["asked"]
+    fake.slot_value = "unknown"
+    out = _send(graph, "잘 모르겠어요")
+    assert out["resolved"][asked["group"]][asked["item"]][asked["slot"]] == "unknown"
+    fake.slot_value = "present"        # 뒤의 발화에서 그 내용을 말했다
+    out = _send(graph, "아 생각났어요. 그건 이렇습니다")
+    assert out["resolved"][asked["group"]][asked["item"]][asked["slot"]] == "present"
+    assert out["collected"][asked["group"]][asked["item"]]["slots"][asked["slot"]] == "present"
+    fake.slot_value = "missing"        # 그 뒤 추출이 "없음"으로 돌려도 "있음"은 풀지 않는다
+    out = _send(graph, "다른 이야기")
+    assert out["collected"][asked["group"]][asked["item"]]["slots"][asked["slot"]] == "present"
+
+
+def test_settled_slots_are_dropped_when_the_offense_form_changes(fake):
+    """죄목 양식이 바뀌면 이전 양식에서 고정한 값과 방금 한 질문을 새 양식에 쓰지 않는다."""
+    from services.pipelines import ASKED_HEADER
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    _send(graph, "이어서 질문해 주세요")
+    fake.slot_value = "present"
+    assert _send(graph, "답했습니다")["resolved"]
+    fake.slot_value = "missing"
+    out = graph.invoke({"request": {"action": "message", "message": "다른 말", "offense": "insult"}}, CONFIG)
+    assert out["offense"] == "insult" and out["resolved"] == {}
+    assert f"\n{ASKED_HEADER}\n" not in _extract_prompt(fake)
+
+
+def test_unsettled_answer_is_not_locked(fake):
+    """답을 받았어도 추출이 "없음"이나 "일부"로 보면 고정하지 않는다. 한 번 더 물을 수 있어야 한다."""
+    fake.slot_value, fake.item_status = "missing", "missing"
+    graph = build_chat_graph(InMemorySaver())
+    graph.invoke(INIT, CONFIG)
+    _send(graph, "이어서 질문해 주세요")
+    out = _send(graph, "딴소리")
+    assert out["resolved"] == {}
 
 
 def test_select_question_sets_caution_from_user_messages_only():
