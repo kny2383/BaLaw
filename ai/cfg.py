@@ -7,14 +7,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-REASONING_EFFORTS = ("minimal", "low", "medium", "high")
+# 모델 세대마다 받는 값이 다르다. gpt-5 계열은 minimal~high, gpt-6 계열은 none·low~max다 (minimal 없음).
+# 여기서는 오타만 막는다. 모델이 받지 않는 값을 주면 호출이 오류로 올라온다.
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
 def _reasoning_effort(name: str, default: str) -> str:
     """추론 강도 설정을 읽는다. 값이 없거나 비어 있으면 default를 쓴다.
 
-    잘못된 값은 시작할 때 막는다. 그대로 보내면 호출이 실패하고, 지금 호출 계층은
-    실패를 빈 문자열로 돌려주기 때문에 모든 항목이 조용히 '없음'으로 처리된다.
+    목록에 없는 값(오타)은 시작할 때 막는다. 목록에는 있지만 그 모델이 받지 않는 값은 여기서 걸리지 않고,
+    첫 호출이 오류로 올라온다 (호출 계층은 실패를 빈 값으로 바꾸지 않는다).
     """
     value = os.getenv(name, "").strip().lower() or default
     if value not in REASONING_EFFORTS:

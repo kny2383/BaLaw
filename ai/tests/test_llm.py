@@ -200,3 +200,15 @@ def test_per_task_settings_are_read_from_the_environment(monkeypatch):
     got = cfg._per_task("LLM_MODEL", {"extract": "default", "compose": "default"})
     assert got == {"extract": "small-model", "compose": "default"}
     assert cfg._per_task("LLM_BASE_URL", {}) == {}
+
+
+def test_reasoning_effort_accepts_values_of_both_model_generations(monkeypatch):
+    """gpt-5 계열의 minimal과 gpt-6 계열의 none·xhigh·max를 모두 받는다. 오타는 시작할 때 막는다."""
+    import cfg
+    for value in ("none", "minimal", "low", "medium", "high", "xhigh", "max"):
+        monkeypatch.setenv("OPENAI_EXTRACT_REASONING_EFFORT", value)
+        assert cfg._reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low") == value
+    monkeypatch.setenv("OPENAI_EXTRACT_REASONING_EFFORT", "lowest")
+    with pytest.raises(ValueError):
+        cfg._reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
+

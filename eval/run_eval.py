@@ -253,7 +253,7 @@ def judge_case(r: dict, judge_cfg: dict) -> None:
         r["errors"].append(f"판정 실패: {e}")
 
 
-def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: float) -> dict:
+def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: float, compose: bool = True) -> dict:
     out = {"id": case["id"], "group": case["group"], "split": case["split"],
            "expected_offense": case["expected_offense"], "errors": [], "turns": []}
     t0 = time.time()
@@ -343,6 +343,11 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
     out["complete"] = complete
     out["questions"] = sum(1 for t in out["turns"] if t.get("reply") and not t.get("complete"))
     out["first_status"] = first_status or {}
+
+    if not compose:
+        # 대화까지만 잰다 (정보 추출 지표 M2·M3). 초안 작성·검증·판정은 하지 않는다.
+        out["wall_s"] = round(time.time() - t0, 3)
+        return out
 
     # 초안 생성
     st, comp, lat = http("POST", f"{ai}/chat/compose", {"session_id": sid})
@@ -477,6 +482,13 @@ def attribute(calls: list[dict], cases: list[dict]) -> dict:
     return by_case
 
 
+# 초안(작성·검증·사용자 확인·판정)에서 나오는 지표.
+DRAFT_METRICS = ("M1_judge_fabricated_total", "M1_cases_with_fabrication", "M1_rule_numeric_total", "M8_judge_assertions",
+                 "M8_regex_assertions", "judged_cases", "verification_status", "verification_removed_total", "confirm_cases",
+                 "M1_basis_includes_confirmation", "confirm_asked_total", "confirm_yes_total", "confirm_user_cost_usd",
+                 "judge_cost_usd", "judge_failed")
+
+
 def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices: dict) -> dict:
     gold = {c["id"]: c for c in cases}
     convo = [r for r in results if r.get("turns")]
@@ -548,7 +560,9 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     kinds = {}
     missing_prices: set = set()
     for r in calls:
-        k = kinds.setdefault(call_kind(r), {"calls": 0, "latency": [], "out": 0, "reasoning": 0, "cost": 0.0})
+        k = kinds.setdefault(call_kind(r), {"calls": 0, "latency": [], "out": 0, "reasoning": 0, "cost": 0.0, "models": set()})
+        if r.get("response_model") or r.get("model"):
+            k["models"].add(r.get("response_model") or r.get("model"))
         u = r.get("usage") or {}
         k["calls"] += 1; k["latency"].append(r.get("latency_s") or 0)
         k["out"] += u.get("completion_tokens") or 0; k["reasoning"] += u.get("reasoning_tokens") or 0
@@ -556,7 +570,9 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["M11_by_kind"] = {k: {"calls": v["calls"],
                             "p50_s": round(statistics.median(v["latency"]), 1),
                             "p95_s": p95(v["latency"]),
-                            "out_tokens": v["out"], "reasoning_tokens": v["reasoning"], "cost_usd": round(v["cost"], 4)}
+                            "out_tokens": v["out"], "reasoning_tokens": v["reasoning"], "cost_usd": round(v["cost"], 4),
+                            # 응답에 적힌 모델 이름. 작업마다 다른 모델을 쓴 실행에서 어느 작업이 어느 모델이었는지 남긴다.
+                            "models": sorted(v["models"])}
                         for k, v in sorted(kinds.items())}
     # 정보 추출 요청에 실제로 실린 추론 강도. 설정이 아니라 기록된 요청에서 읽는다.
     s["extract_reasoning_effort"] = sorted({(r.get("request") or {}).get("reasoning_effort") or "default"
@@ -586,6 +602,11 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["judge_cost_usd"] = round(judge_cost, 4)
     s["judge_failed"] = sum(1 for r in convo if r.get("draft") and "judge" not in r)
     s["models_missing_price"] = sorted(missing_prices)  # 비어 있지 않으면 비용이 과소 계산된 것이다
+    # 초안을 한 건도 만들지 않은 실행(--no-compose)에서는 초안에서 나오는 지표를 0이 아니라 빈 값으로 둔다.
+    # 0으로 두면 "재지 않음"이 "위반 0건"으로 읽힌다.
+    if convo and not any(r.get("compose") for r in results):
+        for key in DRAFT_METRICS:
+            s[key] = None
     return s
 
 
@@ -621,13 +642,13 @@ def proxy_control(url: str, body: dict) -> None:
 
 def write_report(run_id: str, meta: dict, summary: dict, path: Path) -> None:
     rows = "\n".join(f"| {k} | {v} |" for k, v in summary.items() if k not in ("M11_by_kind",))
-    kinds = "\n".join(f"| {k} | {v['calls']} | {v['p50_s']} | {v['p95_s']} | {v['out_tokens']} | {v['reasoning_tokens']} | {v['cost_usd']} |"
+    kinds = "\n".join(f"| {k} | {', '.join(v.get('models') or [])} | {v['calls']} | {v['p50_s']} | {v['p95_s']} | {v['out_tokens']} | {v['reasoning_tokens']} | {v['cost_usd']} |"
                       for k, v in summary.get("M11_by_kind", {}).items())
     meta_rows = "\n".join(f"| {k} | {v} |" for k, v in meta.items())
     path.write_text(
         f"# 평가 결과 {run_id}\n\n## 실행 조건\n\n| 항목 | 값 |\n|---|---|\n{meta_rows}\n\n"
         f"## 지표\n\n| 지표 | 값 |\n|---|---|\n{rows}\n\n"
-        f"## 호출 종류별 (M11)\n\n| 종류 | 호출 | p50 초 | p95 초 | 출력 토큰 | 추론 토큰 | 비용 USD |\n|---|---|---|---|---|---|---|\n{kinds}\n",
+        f"## 호출 종류별 (M11)\n\n| 종류 | 모델 | 호출 | p50 초 | p95 초 | 출력 토큰 | 추론 토큰 | 비용 USD |\n|---|---|---|---|---|---|---|---|\n{kinds}\n",
         encoding="utf-8")
 
 
@@ -646,6 +667,8 @@ def main() -> int:
     ap.add_argument("--confirm-model", default=os.environ.get("EVAL_CONFIRM_MODEL", "gpt-5-mini"),
                     help="서비스가 사용자 확인을 기다릴 때 모의 사용자의 답을 만드는 모델")
     ap.add_argument("--flush-cache", action="store_true", help="실행 전 Redis 판례 요약 캐시를 비운다")
+    ap.add_argument("--no-compose", action="store_true",
+                    help="대화까지만 진행한다. 초안 작성·검증·판정을 하지 않는다 (정보 추출만 비교할 때)")
     args = ap.parse_args()
 
     load_openai_key()
@@ -685,7 +708,8 @@ def main() -> int:
     results = []
     print(f"[{args.run_id}] 사례 {len(cases)}건, 동시 {args.concurrency}, 판정 {judge_cfg}", flush=True)
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futs = {pool.submit(run_case, c, args.ai_url, args.max_turns, judge_cfg, args.rag_timeout): c for c in cases}
+        futs = {pool.submit(run_case, c, args.ai_url, args.max_turns, judge_cfg, args.rag_timeout, not args.no_compose): c
+                for c in cases}
         for f in as_completed(futs):
             c = futs[f]
             try:
@@ -707,6 +731,7 @@ def main() -> int:
         "git_head": git_head(), "split": args.split if not args.only else f"only {len(args.only)}",
         "cases_lock": cases_lock()[:16], "service_models": ", ".join(m for m in service_models if m),
         "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "judge_version": JUDGE_VERSION, "prices_as_of": prices["as_of"],
+        "compose": "하지 않음 (--no-compose)" if args.no_compose else "함",
         "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1), "warmup": warmup,
     }
     (run_dir / "summary.json").write_text(json.dumps({"meta": meta, "summary": summary}, ensure_ascii=False, indent=1), encoding="utf-8")
