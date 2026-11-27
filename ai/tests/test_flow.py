@@ -63,6 +63,45 @@ def test_select_question_completes_when_everything_is_present():
     assert _asked(out["collected"]) == 0
 
 
+def _ask_until_done(limit: int = 200) -> tuple[list[str], dict]:
+    """추출이 계속 "없음"이라고 해도 대화가 끝날 때까지 질문을 받는다. (질문 목록, 마지막 수집 상태)"""
+    state = {"offense": "fraud", "collected": _collected("missing"), "history": [{"role": "user", "content": "사건 개요"}]}
+    asked: list[str] = []
+    for _ in range(limit):
+        out = select_question(state)
+        if out["result"]["complete"]:
+            return asked, out["collected"]
+        asked.append(out["result"]["reply"])
+        # 사용자가 답했지만 추출은 여전히 "없음"으로 본다. 질문 횟수만 이어받는다 (extract 노드와 같다).
+        nxt = _collected("missing")
+        for group in ("elements", "details"):
+            for key, rec in out["collected"][group].items():
+                if "_asked_count" in rec:
+                    nxt[group][key]["_asked_count"] = rec["_asked_count"]
+        state = {"offense": "fraud", "collected": nxt,
+                 "history": out["history"] + [{"role": "user", "content": "답했습니다"}]}
+    raise AssertionError("대화가 끝나지 않는다")
+
+
+def test_answered_must_slot_is_not_asked_again():
+    """한 번 묻고 답을 받은 필수 항목은, 추출이 그 답을 "있음"으로 보지 않아도 다시 묻지 않는다 (M12)."""
+    asked, collected = _ask_until_done()
+    counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
+    assert counts and max(counts) == 1
+    assert len(asked) == len(counts) == len(set(asked)), "같은 질문이 두 번 나오지 않는다"
+
+
+def test_must_ask_limit_two_restores_the_second_ask(monkeypatch):
+    from cfg import settings
+    once, _ = _ask_until_done()
+    monkeypatch.setattr(settings, "MUST_ASK_LIMIT", 2)
+    twice, collected = _ask_until_done()
+    counts = [n for group in collected.values() for rec in group.values() for n in (rec.get("_asked_count") or {}).values()]
+    assert max(counts) == 2 and len(twice) > len(once)
+    assert set(twice) == set(once), "상한은 되묻기만 줄인다. 처음 묻는 항목은 같다"
+    assert len(set(twice)) < len(twice), "상한이 2면 같은 질문이 다시 나온다 (이전 동작)"
+
+
 def test_select_question_sets_caution_from_user_messages_only():
     base = {"offense": "fraud", "collected": _collected("present")}
     user = select_question({**base, "history": [{"role": "user", "content": "협박을 당했습니다"}]})
