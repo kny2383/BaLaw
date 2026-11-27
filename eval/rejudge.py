@@ -47,7 +47,7 @@ def main() -> int:
     ap.add_argument("--only", nargs="*", help="이 사례 id만 다시 판정")
     ap.add_argument("--concurrency", type=int, default=5)
     ap.add_argument("--judge-provider", default="openai")
-    ap.add_argument("--judge-model", default="gpt-5-2025-08-07")
+    ap.add_argument("--judge-model", default="gpt-6.1-sol")  # 옛 판정과 비교할 때는 gpt-5-2025-08-07을 준다 (2026-12-11 종료)
     args = ap.parse_args()
 
     src_dir = ROOT / "runs" / args.src / "cases"
