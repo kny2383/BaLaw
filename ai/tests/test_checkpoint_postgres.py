@@ -53,7 +53,8 @@ def _run_conversation(saver, fake, monkeypatch):
     import services.rag as rag
 
     monkeypatch.setattr(rag, "get_collection", lambda: FakeCollection())
-    fake.keyword = "표식키워드"
+    fake.keyword = "표식키워드"  # 저장소에서 찾아볼 표식. 죄목 목록에 있는 값만 키워드로 받으므로 목록에 더한다
+    monkeypatch.setattr(rag, "_MAJOR_OFFENSE_SET", rag._MAJOR_OFFENSE_SET | {"표식키워드"})
     fake.slot_value, fake.item_status = "missing", "missing"
     chat, rag_graph = build_chat_graph(saver), build_rag_graph(saver)
     cfg = checkpoint.chat_config(SID)

@@ -210,9 +210,12 @@ def test_failed_verification_is_reported_not_hidden(fake, monkeypatch):
     assert BAD in out["draft"]["sections"]["criminal_facts"]  # 초안은 그대로
 
 
-def test_failed_rewrite_keeps_the_draft_and_says_so(fake, monkeypatch):
+@pytest.mark.parametrize("output", ["", "죄송합니다. 지금은 답변할 수 없습니다.",
+                                    "=== 범죄사실 ===\n○ 고소인은 금원을 송금하였습니다.\n"])
+def test_failed_rewrite_keeps_the_draft_and_says_so(fake, monkeypatch, output):
+    """재작성 출력이 비었거나, 거절 문장이거나, 원래 있던 구성(고소이유)이 빠졌으면 고쳐 쓴 것으로 치지 않는다."""
     fake.verify_results = [[BAD]]
-    fake.rewrite_text = ""
+    fake.rewrite_text = output
     out = _compose(fake, monkeypatch)
     assert out["review"]["status"] == "rewrite_failed"
     assert [c["quote"] for c in out["review"]["unsupported"]] == [BAD]
