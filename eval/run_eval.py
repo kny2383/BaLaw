@@ -532,9 +532,12 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["M2_recall"] = pct(tp, tp + fn); s["M2_precision"] = pct(tp, tp + fp)
     # 질문의 구성. 서술에 없는 필수 항목(물어야 하는 것) 가운데 얼마나 물었고 얼마나 넘어갔는가.
     asked = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0, "skipped": 0}
-    for r in convo:
+    # 끝까지 간 대화만 센다. 오류나 턴 상한으로 멈춘 대화에서는 "넘어간 것"과 "아직 못 물은 것"을 가릴 수 없다.
+    finished = [r for r in convo if r.get("complete")]
+    for r in finished:
         for key, n in question_breakdown(r, gold[r["id"]]["slots"]).items():
             asked[key] += n
+    s["M3_breakdown_cases"] = len(finished)
     s["M3_needed_asked"] = asked["needed"]
     s["M3_needed_skipped"] = asked["skipped"]
     s["M3_unneeded_asked"] = asked["unneeded"]
