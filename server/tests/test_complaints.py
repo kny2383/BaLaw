@@ -562,3 +562,22 @@ def test_every_ai_call_carries_the_service_token(monkeypatch):
 def test_no_auth_header_is_sent_without_a_token(monkeypatch):
     assert {auth for _, _, auth in _ai_calls_with_token(monkeypatch, "  ")} == {None}
 
+
+def test_case_summary_failure_reaches_the_client(client, user_tokens, monkeypatch):
+    """AI 서비스가 요약하지 못한 판례(summarized=False)를 알려 주면 화면까지 전달한다. 값이 없으면 요약된 것으로 본다."""
+    from app.api import complaint as complaint_api
+
+    case = {"case_no": "2020도1", "label": "사기", "summary": "원문 앞부분", "result": "(안내)", "similarity": "유사"}
+
+    async def fake_chat_init(text, offense=None, known_pii=None):
+        return {"session_id": "fake-session", "offense": "fraud", "rag_status": "ready", "rag_keyword": "사기",
+                "rag_cases": [{**case, "summarized": False}, {**case, "case_no": "2021도2", "summarized": True},
+                              {**case, "case_no": "2022도3"}]}
+
+    monkeypatch.setattr(complaint_api.ai_service, "chat_init", fake_chat_init)
+    cid = create_complaint(client, user_tokens)
+    r = client.post(f"/api/complaints/{cid}/chat/init", json={"text": "가상의 중고거래 사기 사건 개요", "offense": "사기"},
+                    headers=auth_header(user_tokens))
+    assert r.status_code == 200, r.text
+    assert [c["summarized"] for c in r.json()["rag_cases"]] == [False, True, True]
+

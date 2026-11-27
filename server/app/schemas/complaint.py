@@ -16,6 +16,8 @@ class RagCase(BaseModel):
     summary: str  # 판례 요약
     result: str  # 판결 결과
     similarity: str  # 유사도 설명
+    # 요약을 만들었는가. False면 summary는 판례 원문의 앞부분이다. 이 값이 없던 때 저장된 판례는 True로 본다.
+    summarized: bool = True
 
 # 채팅 초기화 응답 (죄목 자동 판단 + 판례)
 class ChatInitResponse(BaseModel):
