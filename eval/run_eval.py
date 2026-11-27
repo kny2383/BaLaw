@@ -82,9 +82,26 @@ CONFIRM_SCHEMA = {
 
 # ---------------------------------------------------------------- HTTP
 
+# AI 서비스가 토큰을 요구하면 BARO_AI_TOKEN으로 준다. AI 서비스 주소로 가는 요청에만 붙인다 (기록 장치에는 보내지 않는다).
+AI_AUTH = {"url": "", "token": os.environ.get("BARO_AI_TOKEN", "").strip()}
+
+
+def use_ai(url: str) -> None:
+    """토큰을 붙일 AI 서비스 주소를 정한다."""
+    AI_AUTH["url"] = url.rstrip("/")
+
+
+def headers_for(url: str) -> dict:
+    headers = {"Content-Type": "application/json"}
+    base = AI_AUTH["url"]
+    if AI_AUTH["token"] and base and (url == base or url.startswith(base + "/")):
+        headers["Authorization"] = f"Bearer {AI_AUTH['token']}"
+    return headers
+
+
 def http(method: str, url: str, body: dict | None = None, timeout: float = 300) -> tuple[int, dict | None, float]:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(url, data=data, method=method, headers=headers_for(url))
     started = time.time()
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -635,6 +652,7 @@ def main() -> int:
     cases = load_cases(args.split, args.only)
     if not cases:
         raise SystemExit("실행할 사례가 없다")
+    use_ai(args.ai_url)
     st, health, _ = http("GET", f"{args.ai_url}/")
     if st != 200:
         raise SystemExit(f"AI 서비스에 연결하지 못했다: {st}")
