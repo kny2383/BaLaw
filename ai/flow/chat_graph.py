@@ -117,25 +117,11 @@ def extract(state: ChatState) -> dict:
 SETTLED = ("present", "unknown")
 
 
-def _slot_value(parsed: dict, group: str, item: str, slot: str):
-    return (((parsed.get(group) or {}).get(item) or {}).get("slots") or {}).get(slot)
-
-
 def _resolve(resolved: dict, asked: dict | None, parsed: dict) -> dict:
-    """고정 목록을 이번 추출 결과로 고친다. 받은 값은 고치지 않는다.
-
-    - 방금 물은 슬롯이 이번 답으로 정해졌으면(있음, 모름) 더한다.
-    - "모름"으로 고정한 슬롯을 이번 추출이 "있음"으로 봤으면 "있음"으로 바꾼다. 모른다고 했던 것을 사용자가
-      나중에 말한 경우다. 반대로 "있음"으로 고정한 것은 추출이 "없음"으로 돌려도 풀지 않는다 (그것을 막으려는 고정이다).
-    """
+    """방금 물은 슬롯이 이번 답으로 정해졌으면 고정 목록에 더한다. 받은 값은 고치지 않는다."""
     out = copy.deepcopy(resolved)
-    for group, items in out.items():
-        for item, slots in items.items():
-            for slot, value in slots.items():
-                if value == "unknown" and _slot_value(parsed, group, item, slot) == "present":
-                    slots[slot] = "present"
     if asked:
-        value = _slot_value(parsed, asked["group"], asked["item"], asked["slot"])
+        value = (((parsed.get(asked["group"]) or {}).get(asked["item"]) or {}).get("slots") or {}).get(asked["slot"])
         if value in SETTLED:
             out.setdefault(asked["group"], {}).setdefault(asked["item"], {})[asked["slot"]] = value
     return out
