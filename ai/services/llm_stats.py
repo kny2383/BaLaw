@@ -2,7 +2,7 @@
 
 기록(`services.llm`의 `[LLM] {...}` 줄)에는 내용이 없고 수치만 있으므로, 집계에도 내용이 들어가지 않는다.
 
-    GET /llm/stats                                  실행 중인 서비스의 최근 호출
+    GET /llm/stats                                  실행 중인 서비스의 최근 호출 (LLM_STATS_TOKEN을 설정해야 열린다)
     docker compose logs ai | python -m services.llm_stats    로그에 남은 호출 (재시작 전 것도 포함)
 """
 from __future__ import annotations
