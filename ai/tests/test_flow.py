@@ -421,6 +421,23 @@ def test_confirmed_claim_stays_and_becomes_what_the_user_said(fake, monkeypatch)
     assert out["history"][-1]["role"] == "user" and BAD in out["history"][-1]["content"]
 
 
+def test_date_only_claim_is_fixed_without_asking(fake, monkeypatch):
+    """날짜가 다른 일에 붙은 표현은 묻지 않는다. 물으면 그 일이 있었으니 맞다고 답해 날짜가 남는다."""
+    _, graph, out = _compose_with_confirm(fake, monkeypatch, [[(BAD, True)]])
+    assert _kinds(fake) == ["compose", "verify", "rewrite"]
+    assert graph.get_state(CONFIG).next == () and out["review"]["status"] == "rewritten"
+    assert [c["quote"] for c in out["review"]["removed"]] == [BAD]
+
+
+def test_date_only_claim_is_fixed_even_when_the_rest_is_confirmed(fake, monkeypatch):
+    _, graph, out = _compose_with_confirm(fake, monkeypatch, [[(BAD, True), OTHER]])
+    assert [i.value for i in out["__interrupt__"]] == [{"count": 1}], "날짜만 붙은 표현은 물을 개수에 들지 않는다"
+    out = graph.invoke(Command(resume=[True]), CONFIG)
+    assert _kinds(fake) == ["compose", "verify", "rewrite"]
+    assert [c["quote"] for c in out["review"]["confirmed"]] == [OTHER]
+    assert [c["quote"] for c in out["review"]["removed"]] == [BAD]
+
+
 def test_only_denied_claims_go_to_rewrite(fake, monkeypatch):
     _, graph, _ = _compose_with_confirm(fake, monkeypatch, [[BAD, OTHER]])
     out = graph.invoke(Command(resume=[True, False]), CONFIG)
@@ -484,7 +501,8 @@ def test_confirm_limit_must_be_at_least_one(monkeypatch):
 def test_claim_carries_the_sentence_it_sits_in(fake, monkeypatch):
     """검증은 근거 없는 구절만 인용한다. 사용자에게 물을 때 보여 줄 문장은 초안에서 찾아 붙인다."""
     _, _, out = _compose_with_confirm(fake, monkeypatch, [[BAD]])
-    assert out["review"]["unsupported"] == [{"quote": BAD, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
+    assert out["review"]["unsupported"] == [{"quote": BAD, "reason": "대화에 없는 내용", "sentence": SENTENCE,
+                                           "date_moved": False}]
 
 
 def test_rewrite_is_told_which_sentence_the_phrase_is_in(fake, monkeypatch):
@@ -505,7 +523,8 @@ def test_whole_sentence_quote_is_not_repeated(fake, monkeypatch):
 def test_bullet_mark_is_not_part_of_the_quote(fake, monkeypatch):
     fake.verify_results = [["○ " + SENTENCE]]
     out = _compose(fake, monkeypatch)
-    assert out["review"]["removed"] == [{"quote": SENTENCE, "reason": "대화에 없는 내용", "sentence": SENTENCE}]
+    assert out["review"]["removed"] == [{"quote": SENTENCE, "reason": "대화에 없는 내용", "sentence": SENTENCE,
+                                         "date_moved": False}]
 
 
 def test_confirmation_records_only_the_confirmed_phrase_as_said(fake, monkeypatch):

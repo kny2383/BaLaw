@@ -259,8 +259,12 @@ def confirmed_text(claim: dict) -> str:
 
 
 def claims_to_confirm(review: dict) -> list[dict]:
-    """사용자에게 물을 표현. 한 번에 묻는 개수에 상한을 두고, 넘는 것은 묻지 않고 고친다."""
-    return review["unsupported"][:settings.DRAFT_CONFIRM_MAX]
+    """사용자에게 물을 표현. 한 번에 묻는 개수에 상한을 두고, 넘는 것은 묻지 않고 고친다.
+
+    날짜가 다른 일에 붙은 표현은 묻지 않고 고친다. "이 일이 사실인가요?"라고 물으면 사용자는 그 일이 있었으니
+    맞다고 답하고, 사용자가 말하지 않은 날짜가 그대로 남는다.
+    """
+    return [c for c in review["unsupported"] if not c.get("date_moved")][:settings.DRAFT_CONFIRM_MAX]
 
 
 def confirm(state: ChatState) -> dict:
@@ -279,7 +283,8 @@ def confirm(state: ChatState) -> dict:
             break
 
     kept = [c for c, yes in zip(asked, answers) if yes]
-    denied = [c for c, yes in zip(asked, answers) if not yes] + review["unsupported"][len(asked):]
+    not_asked = [c for c in review["unsupported"] if not any(c is a for a in asked)]
+    denied = [c for c, yes in zip(asked, answers) if not yes] + not_asked
     update: dict = {"review": {**review, "status": "flagged" if denied else "confirmed",
                                "unsupported": denied, "confirmed": review["confirmed"] + kept}}
     if kept:
@@ -297,7 +302,8 @@ def route_after_verify(state: ChatState) -> str:
     review = state["review"]
     if review["status"] != "flagged" or review["rewrites"] >= settings.DRAFT_MAX_REWRITES:
         return END
-    return "confirm" if settings.DRAFT_CONFIRM else "rewrite"
+    # 물을 표현이 없으면(모두 날짜만 떼면 되는 것) 멈추지 않고 바로 고친다.
+    return "confirm" if settings.DRAFT_CONFIRM and claims_to_confirm(review) else "rewrite"
 
 
 def route_after_confirm(state: ChatState) -> str:
