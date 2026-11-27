@@ -53,6 +53,7 @@ ENCRYPTION_KEY=change-this-fernet-key
 OPENAI_API_KEY=sk-your-openai-api-key
 OPENAI_MODEL=gpt-5-mini
 RAG_DB_URL=https://your-presigned-rag-db-url/chroma.sqlite3
+BARO_AI_TOKEN=   # 직접 만든 긴 무작위 값. 비어 있으면 뜨지 않는다: python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 CORS_ORIGINS=https://baro-front-five.vercel.app
 BACKEND_PORT=8000

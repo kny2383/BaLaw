@@ -27,6 +27,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       RAG_DB_URL: ${RAG_DB_URL:?RAG_DB_URL is required}
+      BARO_AI_TOKEN: ${BARO_AI_TOKEN:?BARO_AI_TOKEN is required}
     volumes:
       - rag_data:/app/data/rag_db
     expose:
@@ -57,6 +58,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       BARO_AI_URL: http://baro-ai:8000
+      BARO_AI_TOKEN: ${BARO_AI_TOKEN:?BARO_AI_TOKEN is required}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
