@@ -482,6 +482,34 @@ def attribute(calls: list[dict], cases: list[dict]) -> dict:
     return by_case
 
 
+def question_breakdown(result: dict, gold: dict) -> dict:
+    """대화 한 건의 질문을 종류별로 센다. 질문 수(M3)만으로는 "덜 물어서 좋은 것"과 "물어야 할 것을 안 물은 것"을 가릴 수 없다.
+
+    needed     서술에 없는 필수 항목을 물었다 (필요한 질문)
+    unneeded   서술에 이미 있는 필수 항목을 물었다
+    reasked    이미 물었던 필수 항목을 다시 물었다
+    other      정답에 없는 항목을 물었다
+    skipped    서술에 없는 필수 항목인데 대화가 끝날 때까지 한 번도 묻지 않았다
+    """
+    out = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0}
+    seen: set = set()
+    for turn in result.get("turns") or []:
+        if turn.get("complete") or not turn.get("reply"):
+            continue
+        for slot in turn.get("asked_slots") or []:
+            if slot not in gold:
+                out["other"] += 1
+            elif slot in seen:
+                out["reasked"] += 1
+            elif gold[slot]["in_narrative"]:
+                out["unneeded"] += 1
+            else:
+                out["needed"] += 1
+            seen.add(slot)
+    out["skipped"] = sum(1 for slot, g in gold.items() if not g["in_narrative"] and slot not in seen)
+    return out
+
+
 # 초안(작성·검증·사용자 확인·판정)에서 나오는 지표.
 DRAFT_METRICS = ("M1_judge_fabricated_total", "M1_cases_with_fabrication", "M1_rule_numeric_total", "M8_judge_assertions",
                  "M8_regex_assertions", "judged_cases", "verification_status", "verification_removed_total", "confirm_cases",
@@ -502,6 +530,15 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
             pred = r["first_status"].get(slot) == "present"
             tp += pred and g["in_narrative"]; fp += pred and not g["in_narrative"]; fn += (not pred) and g["in_narrative"]
     s["M2_recall"] = pct(tp, tp + fn); s["M2_precision"] = pct(tp, tp + fp)
+    # 질문의 구성. 서술에 없는 필수 항목(물어야 하는 것) 가운데 얼마나 물었고 얼마나 넘어갔는가.
+    asked = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0, "skipped": 0}
+    for r in convo:
+        for key, n in question_breakdown(r, gold[r["id"]]["slots"]).items():
+            asked[key] += n
+    s["M3_needed_asked"] = asked["needed"]
+    s["M3_needed_skipped"] = asked["skipped"]
+    s["M3_unneeded_asked"] = asked["unneeded"]
+    s["M3_other_asked"] = asked["other"]
 
     # M3, M12
     q = [r["questions"] for r in convo]
