@@ -110,6 +110,12 @@ def test_failed_summary_is_marked_and_not_stored(fake, cache, broken):
     assert rag.get_or_create_case_summary(CASE)["summarized"] is True and len(cache) == 1
 
 
+def test_fallback_is_not_empty_when_the_case_has_no_facts(fake, cache):
+    fake.fail_summary = True
+    out = rag.get_or_create_case_summary({"case_no": "2020도2", "label": "사기", "summary": "자료에 든 요약", "facts": ""})
+    assert out["summarized"] is False and out["summary"] == "자료에 든 요약"
+
+
 def test_failure_stored_before_this_rule_is_not_served(fake, cache):
     """예전에는 실패 결과도 저장했다. 그런 항목을 만나면 쓰지 않고 다시 요약한다."""
     key = rag._case_summary_cache_key(CASE["case_no"])

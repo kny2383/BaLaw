@@ -293,11 +293,14 @@ def _normalize_case_summary(fallback: dict, data) -> dict:
 
 
 def _fallback_case_summary(case: dict) -> dict:
-    """요약을 만들지 못했을 때의 결과. 판례 원문의 앞부분을 넣고 summarized=False로 알린다."""
+    """요약을 만들지 못했을 때의 결과. 판례 원문의 앞부분을 넣고 summarized=False로 알린다.
+
+    원문(facts)이 비어 있으면 판례 자료에 들어 있는 요약 글(summary)을 넣는다. 빈 글을 돌려주지 않기 위해서다.
+    """
     return {
         "case_no": case.get("case_no", ""),
         "label": case.get("label", ""),
-        "summary": case.get("facts", "")[:200],
+        "summary": (case.get("facts") or "")[:200] or (case.get("summary") or "")[:200],
         "result": NO_RESULT,
         "summarized": False,
     }
