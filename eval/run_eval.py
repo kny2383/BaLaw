@@ -681,7 +681,7 @@ def main() -> int:
                   f"{r.get('wall_s', 0):6.0f}s 오류 {len(r['errors'])}", flush=True)
     time.sleep(1)
     calls = load_calls(args.run_id, started)
-    prices = json.loads((ROOT / "prices.json").read_text(encoding="utf-8"))
+    prices = json.loads((ROOT.parent / "ai" / "prices.json").read_text(encoding="utf-8"))
     summary = summarize(results, cases, calls, prices)
     service_models = sorted({(c.get("response_model") or c.get("model")) for c in calls if c.get("model")})
     meta = {

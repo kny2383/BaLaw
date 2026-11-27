@@ -8,7 +8,8 @@
 - 작업별 모델: `LLM_MODEL_<작업>` (예: LLM_MODEL_EXTRACT). 없으면 이전과 같은 기본값이다.
 - 작업별 주소: `LLM_BASE_URL_<작업>`. OpenAI 호환 API를 내는 다른 서버(로컬 모델 등)로 보낼 때 쓴다.
   이때 OpenAI 키는 보내지 않는다. 그 서버의 키가 있으면 `LLM_API_KEY_<작업>`으로 준다.
-- 모든 호출은 같은 형식으로 기록한다: 작업, 모델, 토큰, 걸린 시간, 성공 여부. 내용은 기록하지 않는다.
+- 모든 호출은 같은 형식으로 기록한다: 작업, 모델, 프롬프트 판본, 토큰, 비용, 걸린 시간, 성공 여부.
+  내용은 기록하지 않는다.
 - 실패는 빈 값으로 바꾸지 않고 예외로 올린다 (지표 M10).
 
 모델 객체는 LangChain의 채팅 모델 인터페이스를 쓴다 (결정 0003). 지금 연결된 공급자는 OpenAI와
@@ -16,10 +17,12 @@ OpenAI 호환 서버다. 다른 공급자는 `_PROVIDERS`에 모델을 만드는
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
 from collections import deque
+from pathlib import Path
 from typing import Optional, Type
 
 from langchain_openai import ChatOpenAI
@@ -85,14 +88,48 @@ def reset() -> None:
     _models.clear()
 
 
+_ROOT = Path(__file__).resolve().parent.parent
+# 단가표 (100만 토큰당 달러). 평가기도 같은 파일을 읽는다.
+PRICES: dict = json.loads((_ROOT / "prices.json").read_text(encoding="utf-8"))
+# 작업별 프롬프트 판본. 기준 요청(tests/fixtures/llm_requests.json)을 다시 만들 때 함께 만들어진다.
+PROMPT_VERSIONS: dict = json.loads((_ROOT / "prompt_versions.json").read_text(encoding="utf-8"))
+
+
+def prompt_version_of(body: dict) -> str:
+    """요청 본문에서 프롬프트 판본을 만든다. 메시지와 출력 형식이 같으면 같은 판본이다 (모델과 추론 강도는 뺀다)."""
+    core = {"messages": body.get("messages"), "response_format": body.get("response_format")}
+    return hashlib.sha256(json.dumps(core, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:8]
+
+
+def cost_usd(task: str, model: Optional[str], input_tokens: Optional[int], cached_tokens: Optional[int],
+             output_tokens: Optional[int]) -> Optional[float]:
+    """호출 한 번의 비용. 계산할 수 없으면 0이 아니라 None이다.
+
+    토큰 수가 없거나, 단가표에 없는 모델이거나, 다른 서버로 보낸 작업(단가가 다르다)이면 계산하지 않는다.
+    캐시된 입력 토큰은 캐시 단가로 계산한다. 추론 토큰은 출력 토큰에 들어 있다.
+    """
+    if input_tokens is None or output_tokens is None or settings.LLM_BASE_URLS.get(task):
+        return None
+    price = PRICES["models"].get(PRICES["aliases"].get(model, model))
+    if not price:
+        return None
+    cached = cached_tokens or 0
+    fresh = input_tokens - cached
+    return round((fresh * price["input"] + cached * price.get("cached_input", price["input"])
+                  + output_tokens * price["output"]) / 1e6, 8)
+
+
 def _record(task: str, started: float, message=None, error: Optional[str] = None) -> None:
     provider, name = spec(task)
     usage = getattr(message, "usage_metadata", None) or {}
+    response_model = (getattr(message, "response_metadata", None) or {}).get("model_name")
+    cached = (usage.get("input_token_details") or {}).get("cache_read")
     rec = {
-        "task": task, "provider": provider, "model": name,
-        "response_model": (getattr(message, "response_metadata", None) or {}).get("model_name"),
-        "input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens"),
+        "task": task, "provider": provider, "model": name, "response_model": response_model,
+        "prompt_version": PROMPT_VERSIONS.get(task),
+        "input_tokens": usage.get("input_tokens"), "cached_tokens": cached, "output_tokens": usage.get("output_tokens"),
         "reasoning_tokens": (usage.get("output_token_details") or {}).get("reasoning"),
+        "cost_usd": cost_usd(task, response_model or name, usage.get("input_tokens"), cached, usage.get("output_tokens")),
         "latency_s": round(time.time() - started, 3), "ok": error is None, "error": error,
     }
     RECENT.append(rec)
