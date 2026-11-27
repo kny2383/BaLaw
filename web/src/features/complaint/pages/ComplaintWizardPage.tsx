@@ -116,6 +116,8 @@ const ComplaintWizardPage: React.FC = () => {
 
   // 초안에서 사용자 확인이 필요한 표현 (없으면 null)
   const [claimsToConfirm, setClaimsToConfirm] = useState<DraftClaim[] | null>(null);
+  // 초안을 고쳐 쓰면서 묻지 않고 날짜를 뺀 표현. 미리보기에서 알린다
+  const [dateRemoved, setDateRemoved] = useState<DraftClaim[]>([]);
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   // 확인을 물은 횟수. 같은 표현을 다시 물어도 창을 새로 만들어 이전 답이 남지 않게 한다
@@ -136,6 +138,7 @@ const ComplaintWizardPage: React.FC = () => {
         return;
       }
       setGeneratedComplaint(res.generated_complaint);
+      setDateRemoved(res.date_removed);
       setClaimsToConfirm(null);
       nextRaw();
     } catch (e) {
@@ -302,6 +305,7 @@ const ComplaintWizardPage: React.FC = () => {
         }
 
         setGeneratedComplaint(res.generated_complaint);
+        setDateRemoved(res.date_removed);
         nextRaw(); // → step 9 (ComplaintPreviewSection)
       } catch (e) {
         console.error('failed to generate complaint', e);
@@ -681,6 +685,7 @@ const ComplaintWizardPage: React.FC = () => {
               <ComplaintPreviewSection
                 complaintId={complaintId}
                 content={generatedComplaint}
+                dateRemoved={dateRemoved}
               />
             </div>
           )}

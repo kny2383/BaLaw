@@ -253,6 +253,15 @@ def test_compose_asks_the_user_before_rewriting(client, fake, confirm_on):
     assert "피고소인에게" not in body["sections"]["criminal_facts"]
 
 
+def test_compose_reports_dates_removed_without_asking(client, fake, confirm_on):
+    """날짜만 붙은 표현은 묻지 않고 고친다. 화면이 사용자에게 알릴 수 있게 응답에 그 표현과 표시를 싣는다."""
+    _, body = _compose_waiting(client, fake, [("피고소인에게", True)])
+    v = body["verification"]
+    assert v["status"] == "rewritten" and "to_confirm" not in v
+    assert [(c["quote"], c["date_moved"]) for c in v["removed"]] == [("피고소인에게", True)]
+    assert all(c["sentence"] for c in v["removed"]), "화면이 처음 적었던 문장을 보여 준다"
+
+
 def test_confirm_keeps_what_the_user_confirms(client, fake, confirm_on):
     sid, _ = _compose_waiting(client, fake, ["피고소인에게"])
     body = client.post("/chat/compose/confirm", json={"session_id": sid, "answers": [True]}).json()
