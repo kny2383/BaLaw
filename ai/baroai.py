@@ -4,7 +4,6 @@ import hmac
 from fastapi import BackgroundTasks, Depends, Header, HTTPException, Request, Response
 from uuid import uuid4
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Literal, Optional
 from cfg import settings
@@ -54,10 +53,7 @@ async def startup_event():
     print("[STARTUP] RAG resources ready!")
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
-)
+# CORS 설정은 두지 않는다. 이 서비스는 서버만 부르고, 브라우저가 직접 부르지 않는다.
 
 # 세션 상태는 그래프의 체크포인터에 thread별로 남는다 (flow/checkpoint.py).
 CHAT_GRAPH = build_chat_graph()

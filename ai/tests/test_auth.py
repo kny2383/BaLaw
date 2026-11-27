@@ -71,3 +71,11 @@ def test_api_description_is_not_served_when_a_token_is_configured():
     assert run("service-secret") == "[404, 404, 404, 200]"
     assert run("") == "[200, 200, 200, 200]"
 
+
+def test_browsers_on_other_origins_are_not_allowed(client):
+    """브라우저가 다른 출처에서 이 서비스를 직접 부르도록 허용하지 않는다 (CORS 허용 헤더를 내지 않는다)."""
+    r = client.get("/", headers={"Origin": "https://example.com"})
+    assert r.status_code == 200 and "access-control-allow-origin" not in r.headers
+    preflight = client.options("/chat/init", headers={"Origin": "https://example.com", "Access-Control-Request-Method": "POST"})
+    assert "access-control-allow-origin" not in preflight.headers
+
