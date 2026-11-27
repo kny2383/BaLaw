@@ -48,10 +48,15 @@ def collect(client, fake, offense: str = OFFENSES[0][1], text: str = OFFENSES[0]
 
 
 def versions_of(by_offense: list[dict]) -> dict:
-    """작업별 판본. 죄목별 요청을 모두 넣어 만든다."""
+    """작업별 판본. 죄목별 요청을 모두 넣어 만든다.
+
+    어느 죄목에서든 한 작업의 요청이 빠져 있으면 오류다. 건너뛰면 그 죄목의 프롬프트 변경이 판본에 반영되지 않는다.
+    """
     import services.llm as llm
-    return {task: llm.prompt_version_of(*[bodies[task] for bodies in by_offense if task in bodies])
-            for task in sorted(by_offense[0])}
+    for bodies in by_offense:
+        if sorted(bodies) != sorted(llm.TASKS):
+            raise ValueError(f"기준 요청에 빠진 작업이 있습니다: {sorted(set(llm.TASKS) - set(bodies))}")
+    return {task: llm.prompt_version_of(*[bodies[task] for bodies in by_offense]) for task in sorted(llm.TASKS)}
 
 
 if __name__ == "__main__":

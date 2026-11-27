@@ -83,6 +83,13 @@ def test_requests_of_every_offense_match_the_stored_ones(client, fake):
         assert sorted(stored) == sorted(llm.TASKS), name
 
 
+def test_versions_are_not_made_from_requests_with_a_missing_task():
+    stored = [json.loads((FIXTURE.parent / name).read_text(encoding="utf-8")) for name, _, _ in OFFENSES]
+    without_rewrite = {task: body for task, body in stored[1].items() if task != "rewrite"}
+    with pytest.raises(ValueError, match="rewrite"):
+        versions_of([stored[0], without_rewrite])
+
+
 def test_a_prompt_change_in_any_offense_changes_the_version():
     fraud = {"messages": [{"role": "user", "content": "사기 규칙"}]}
     insult = {"messages": [{"role": "user", "content": "모욕 규칙"}]}
