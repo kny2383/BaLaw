@@ -589,7 +589,9 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["M3_needed_skipped"] = asked["skipped"]
     s["M3_unneeded_asked"] = asked["unneeded"]
     s["M3_other_asked"] = asked["other"]
-    # 이미 물은 필수 항목을 다시 물은 수. 위 넷과 더하면 끝까지 간 대화에서 물은 항목의 합이 된다.
+    # 엉뚱한 답 뒤에 다시 물은 수 (--stray-every로 잴 때만 0이 아니다). 되묻기가 아니라 필요한 질문이다.
+    s["M3_recovered_asked"] = asked["recovered"]
+    # 이미 물은 필수 항목을 다시 물은 수. 위 다섯과 더하면 끝까지 간 대화에서 물은 항목의 합이 된다.
     # M12_reasked_total은 멈춘 대화도 포함하므로, 모든 대화가 끝까지 갔을 때만 두 값이 같다.
     s["M3_reasked"] = asked["reasked"]
 
