@@ -15,6 +15,7 @@
           검증 상태 unverified·rewrite_failed)
   은폐    실패가 주입됐는데 응답이 정상과 구분되지 않는다  → M10에 센다
   미발생  그 호출이 일어나지 않아 주입되지 않았다 (예: 검증이 고칠 표현을 찾지 못해 재작성이 없었다)
+  측정 불가  주입은 됐는데 그 단계의 결과를 받지 못했다 (판례 검색이 시간 안에 끝나지 않음 등). M10에 세지 않는다
 
 AI 서비스는 compose.eval.yaml로 띄워 기록 장치를 거쳐야 한다. 주입 대상이 아닌 호출은 실제 모델로 간다 (비용이 든다).
 """
@@ -60,7 +61,9 @@ def rag_step(rag: dict) -> dict:
     not_summarized = sum(1 for c in cases if c.get("summarized") is False)
     return {"step": "rag", "rag_status": rag.get("rag_status"), "keyword": rag.get("rag_keyword"), "cases": len(cases),
             "not_summarized": not_summarized,
-            "signal": rag.get("rag_status") == "failed" or not_summarized > 0}
+            "signal": rag.get("rag_status") == "failed" or not_summarized > 0,
+            # 끝나지 않았거나(시간 초과) 조회하지 못했으면 드러났는지 은폐됐는지 말할 수 없다.
+            "unmeasured": rag.get("rag_status") not in ("ready", "failed")}
 
 
 def compose_step(name: str, status: int, body: dict | None) -> dict:
@@ -131,7 +134,12 @@ def judge(scenario: dict, injected: int) -> str:
     if injected == 0:
         return "미발생"
     steps = [s for s in scenario["steps"] if s["step"] in TARGET_STEPS[scenario["kind"]] or s["step"] == "init"]
-    return "드러남" if any(s["signal"] for s in steps) else "은폐"
+    if any(s["signal"] for s in steps):
+        return "드러남"
+    # 대상 단계에 이르지 못했거나 그 단계의 결과를 받지 못했으면 은폐로 세지 않는다.
+    if not steps or any(s.get("unmeasured") for s in steps):
+        return "측정 불가"
+    return "은폐"
 
 
 def main() -> int:
@@ -177,6 +185,7 @@ def main() -> int:
         "M10_concealed": sum(1 for s in scenarios if s["verdict"] == "은폐"),
         "revealed": sum(1 for s in scenarios if s["verdict"] == "드러남"),
         "not_exercised": sum(1 for s in scenarios if s["verdict"] == "미발생"),
+        "unmeasured": sum(1 for s in scenarios if s["verdict"] == "측정 불가"),
         "cost_usd": round(cost, 4), "models_missing_price": sorted(missing),
         "wall_min": round((time.time() - started) / 60, 1),
     }
@@ -187,7 +196,7 @@ def main() -> int:
     print(json.dumps(summary, ensure_ascii=False, indent=1))
     print("| 호출 | 방식 | 주입 | 판정 | 응답 |\n|---|---|---|---|---|")
     for s in scenarios:
-        shown = "; ".join(" ".join(f"{k}={v}" for k, v in step.items() if k not in ("signal", "draft_head")) for step in s["steps"])
+        shown = "; ".join(" ".join(f"{k}={v}" for k, v in step.items() if k not in ("signal", "draft_head", "unmeasured")) for step in s["steps"])
         print(f"| {s['kind']} | {s['mode']} | {s['injected_calls']} | {s['verdict']} | {shown} |")
     return 0
 
