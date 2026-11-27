@@ -45,10 +45,23 @@ def test_mixed_prompt_versions_are_visible():
     assert g["prompt_versions"] == ["aaaa1111", "bbbb2222"]
 
 
+def test_sessions_are_grouped_by_tag():
+    records = [rec(session="a", cost=0.01), rec("verify", session="a", cost=0.02), rec(session="b", cost=0.05),
+               rec(session="c", cost=None), rec(session="c", cost=0.01), rec(session=None)]
+    ss = llm_stats.summarize(records)["sessions"]
+    assert ss["count"] == 3 and ss["calls_without_session"] == 1
+    # 비용을 모르는 호출이 섞인 세션은 비용 통계에서 빼고 수만 센다.
+    assert ss["sessions_with_unknown_cost"] == 1
+    assert ss["cost_usd_mean"] == 0.04 and ss["cost_usd_p50"] == 0.03 and ss["cost_usd_p95"] == 0.05
+    assert ss["calls_p50"] == 2.0
+    assert "세션 3건" in llm_stats.table(llm_stats.summarize(records))
+
+
 def test_empty_summary():
     s = llm_stats.summarize([])
     assert s["tasks"] == {} and s["total"]["calls"] == 0 and s["total"]["failure_rate"] is None
     assert s["total"]["latency_p50_s"] is None
+    assert s["sessions"]["count"] == 0 and s["sessions"]["cost_usd_mean"] is None
 
 
 def test_log_lines_are_parsed_and_other_lines_skipped():
@@ -80,4 +93,5 @@ def test_stats_endpoint_reports_recent_calls_without_content(client, fake, monke
     assert body["total"]["calls"] == len(llm.RECENT) and body["total"]["failed"] == 0
     assert body["tasks"]["compose"]["prompt_versions"] == [llm.PROMPT_VERSIONS["compose"]]
     assert body["total"]["calls_without_cost"] == 0 and body["total"]["cost_usd"] > 0
+    assert body["sessions"]["count"] == 1 and body["sessions"]["calls_without_session"] == 0
     assert "30만원" not in json.dumps(body, ensure_ascii=False)

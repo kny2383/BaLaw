@@ -36,11 +36,36 @@ def test_every_call_is_recorded_without_content(client, fake):
     for rec in llm.RECENT:
         assert rec["ok"] is True and rec["provider"] == "openai" and rec["model"] == "gpt-5-mini"
         assert rec["input_tokens"] == 1 and rec["output_tokens"] == 1 and rec["latency_s"] >= 0
-        assert set(rec) == {"task", "provider", "model", "response_model", "prompt_version", "input_tokens",
+        assert set(rec) == {"task", "session", "provider", "model", "response_model", "prompt_version", "input_tokens",
                             "cached_tokens", "output_tokens", "reasoning_tokens", "cost_usd", "latency_s", "ok", "error"}
         assert rec["prompt_version"] == llm.PROMPT_VERSIONS[rec["task"]]
         assert rec["cost_usd"] == pytest.approx((0.25 + 2.00) / 1e6)  # gpt-5-mini 입력 1토큰 + 출력 1토큰
     assert "30만원" not in json.dumps(list(llm.RECENT), ensure_ascii=False)
+
+
+def test_calls_of_one_session_share_a_tag_that_is_not_the_session_id(client, fake, capsys):
+    """작성 한 건의 호출을 묶어 볼 수 있다. 세션 값 자체는 기록과 로그에 남지 않는다."""
+    llm.RECENT.clear()
+    collect(client, fake)
+    tags = {r["session"] for r in llm.RECENT}
+    assert len(tags) == 1 and None not in tags  # 대화, 작성, 검증, 재작성, 판례 검색 모두 같은 표지
+    sid = fake_session_id(client)  # 다른 세션은 다른 표지
+    assert llm.RECENT[-1]["session"] == llm.session_tag(sid) and llm.session_tag(sid) not in tags
+    assert len(llm.session_tag(sid)) == 12 and sid not in capsys.readouterr().out
+    llm.text("compose", "본문", system="You are a drafting assistant")  # 세션 밖의 호출
+    assert llm.RECENT[-1]["session"] is None
+
+
+def fake_session_id(client) -> str:
+    return client.post("/chat/init", json={"text": "중고거래로 30만원을 보냈는데 물건이 오지 않았습니다.", "offense": "사기"}).json()["session_id"]
+
+
+def test_failure_logs_carry_the_tag_not_the_session_id(client, fake, capsys):
+    sid = fake_session_id(client)
+    fake.fail_compose = True
+    assert client.post("/chat/compose", json={"session_id": sid}).status_code == 502
+    out = capsys.readouterr().out
+    assert sid not in out and f"session={llm.session_tag(sid)}" in out
 
 
 def test_prompt_versions_match_the_stored_requests():
