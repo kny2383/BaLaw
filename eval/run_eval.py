@@ -50,7 +50,7 @@ ASSERTION_RE = re.compile(r"(성립한다|성립합니다|성립된다|성립됩
 #   2: AI 질문과 사용자 답을 짝지어 전달, 넣을 것·넣지 않을 것 명시 (baseline-1 M1 사람 검수 반영)
 #   3: 맥락으로 알 수 있는 사실은 넣지 않고, 사용자가 말한 것보다 구체적으로 특정한 것은 넣는다
 #      (2026-11-27 사람 검수 반영, eval/results/judge-model-dev10.md)
-JUDGE_VERSION = "3"
+JUDGE_VERSION = "2"  # 3판은 보지 않은 초안으로 검증한 뒤 기본값으로 한다
 JUDGE_VERSIONS = ("2", "3")
 JUDGE_SYSTEM = (
     "당신은 고소장 초안의 사실 정확성을 검수하는 검토자다. "
@@ -231,8 +231,6 @@ V3_DO = ("- 사용자가 말한 것보다 구체적으로 특정한 것. 맥락�
 
 
 def judge_prompt(r: dict, version: str = JUDGE_VERSION) -> str:
-    if version not in JUDGE_VERSIONS:
-        raise ValueError(f"모르는 판정 기준 판본: {version!r} (가능: {JUDGE_VERSIONS})")
     v3 = version == "3"
     return ("[대화 기록]\n" + judge_transcript(r) +
             "\n\n[고소장 초안]\n" + r["draft"] +
@@ -264,6 +262,8 @@ def judge_case(r: dict, judge_cfg: dict) -> None:
     """r["judge"]를 채운다. 실패하면 r["errors"]에 남긴다 (빈 결과로 바꾸지 않는다)."""
     try:
         version, effort = judge_cfg.get("version", JUDGE_VERSION), judge_cfg.get("reasoning_effort")
+        if version not in JUDGE_VERSIONS:  # 모르는 판본을 조용히 2판으로 판정하지 않는다. 판정 실패로 남긴다
+            raise JudgeError(f"모르는 판정 기준 판본: {version!r} (가능: {JUDGE_VERSIONS})")
         j = judge(judge_cfg["provider"], judge_cfg["model"], JUDGE_SYSTEM, judge_prompt(r, version), JUDGE_SCHEMA, effort)
         r["judge"] = {"provider": j.provider, "model": j.model, "response_model": j.response_model,
                       "version": version, "reasoning_effort": effort or "default",
