@@ -1,7 +1,7 @@
 import copy
 import hmac
 
-from fastapi import BackgroundTasks, Header, HTTPException, Response
+from fastapi import BackgroundTasks, Depends, Header, HTTPException, Request, Response
 from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,12 +17,36 @@ from services.rag import map_keyword_to_offense
 from services.rag_bootstrap import ensure_rag_resources
 from langgraph.types import Command
 
-app = FastAPI(title="BARO-AI: Complaint Draft API", version="0.1.0")
+# 토큰 없이 열어 두는 주소: 상태 확인(/)과, 자기 토큰을 따로 가진 호출 기록 집계(/llm/stats).
+OPEN_PATHS = ("/", "/llm/stats")
+
+
+def _bearer_matches(authorization: Optional[str], expected: str) -> bool:
+    given = (authorization or "").removeprefix("Bearer ").strip()
+    return hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8"))
+
+
+def require_service_token(request: Request, authorization: Optional[str] = Header(default=None)) -> None:
+    """BARO_AI_TOKEN이 설정돼 있으면 `Authorization: Bearer <토큰>`이 맞는 요청만 받는다.
+
+    이 서비스의 주소는 세션 값만 알면 그 세션의 대화를 이어 가고 초안을 만들 수 있다.
+    서버만 부를 수 있게 하려는 것이다. 사용자 인증은 서버가 한다.
+    """
+    expected = settings.BARO_AI_TOKEN
+    if not expected or request.url.path in OPEN_PATHS:
+        return
+    if not _bearer_matches(authorization, expected):
+        raise HTTPException(401, "인증이 필요합니다.", headers={"WWW-Authenticate": "Bearer"})
+
+
+app = FastAPI(title="BARO-AI: Complaint Draft API", version="0.1.0", dependencies=[Depends(require_service_token)])
 
 
 @app.on_event("startup")
 async def startup_event():
     """서비스 시작 시 RAG DB 준비"""
+    if not settings.BARO_AI_TOKEN:
+        print("[AUTH] BARO_AI_TOKEN이 없습니다. /chat/* 주소를 토큰 없이 부를 수 있습니다. 외부에서 닿지 않는 곳에서만 이렇게 씁니다.")
     print("[STARTUP] Ensuring RAG resources...")
     ensure_rag_resources()
     print("[STARTUP] RAG resources ready!")
@@ -81,8 +105,7 @@ def llm_call_stats(authorization: Optional[str] = Header(default=None)):
     토큰이 없거나 틀리면 주소가 있는지도 알리지 않는다 (404).
     """
     expected = settings.LLM_STATS_TOKEN
-    given = (authorization or "").removeprefix("Bearer ").strip()
-    if not expected or not hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8")):
+    if not expected or not _bearer_matches(authorization, expected):
         raise HTTPException(status_code=404, detail="Not Found")
     return {"window": llm.RECENT.maxlen, **llm_stats.summarize(llm.recent())}
 

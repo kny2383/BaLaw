@@ -40,6 +40,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       # 대화 상태를 PostgreSQL에 암호화해서 저장한다. ai/.env에 CHECKPOINT_AES_KEY가 있어야 뜬다.
       CHECKPOINT_DB_URL: postgresql://baro:baro@postgres:5432/baro_db
+      # 값을 주면 AI 서비스가 이 토큰을 요구하고 서버가 같은 값을 보낸다. 로컬 기본은 비어 있다 (포트는 로컬 주소에만 열린다).
+      #   BARO_AI_TOKEN=아무값 docker compose up -d --build
+      BARO_AI_TOKEN: ${BARO_AI_TOKEN:-}
     volumes:
       # 로컬에 있는 판례 벡터 DB를 그대로 쓴다. 있으면 S3 다운로드를 건너뛴다.
       - ./ai/data/rag_db:/app/data/rag_db
@@ -63,6 +66,7 @@ services:
     environment:
       DATABASE_URL: postgresql://baro:baro@postgres:5432/baro_db
       BARO_AI_URL: http://ai:8000
+      BARO_AI_TOKEN: ${BARO_AI_TOKEN:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

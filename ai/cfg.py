@@ -71,6 +71,9 @@ class Settings:
     LLM_BASE_URLS: dict = _per_task("LLM_BASE_URL", {})
     # 작업별 주소를 쓰는 서버의 키. 주소를 지정한 작업에는 OPENAI_API_KEY를 보내지 않는다.
     LLM_API_KEYS: dict = _per_task("LLM_API_KEY", {})
+    # 이 서비스를 부르는 쪽(서버)이 보내야 하는 토큰. 값을 넣으면 /chat/* 주소가 이 토큰을 요구한다.
+    # 비우면 요구하지 않는다 (누구나 부를 수 있다). 운영 구성은 값이 없으면 뜨지 않는다.
+    BARO_AI_TOKEN: str = os.getenv("BARO_AI_TOKEN", "").strip()
     # 호출 기록 집계(GET /llm/stats)를 읽는 토큰. 비워 두면 그 주소는 닫혀 있다 (404).
     LLM_STATS_TOKEN: str = os.getenv("LLM_STATS_TOKEN", "").strip()
     # LLM 호출이 일시적 오류(연결, 시간 초과, 429, 5xx)로 실패했을 때 다시 시도하는 횟수.
