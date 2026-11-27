@@ -482,6 +482,13 @@ def attribute(calls: list[dict], cases: list[dict]) -> dict:
     return by_case
 
 
+# 초안(작성·검증·사용자 확인·판정)에서 나오는 지표.
+DRAFT_METRICS = ("M1_judge_fabricated_total", "M1_cases_with_fabrication", "M1_rule_numeric_total", "M8_judge_assertions",
+                 "M8_regex_assertions", "judged_cases", "verification_status", "verification_removed_total", "confirm_cases",
+                 "M1_basis_includes_confirmation", "confirm_asked_total", "confirm_yes_total", "confirm_user_cost_usd",
+                 "judge_cost_usd", "judge_failed")
+
+
 def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices: dict) -> dict:
     gold = {c["id"]: c for c in cases}
     convo = [r for r in results if r.get("turns")]
@@ -595,6 +602,11 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["judge_cost_usd"] = round(judge_cost, 4)
     s["judge_failed"] = sum(1 for r in convo if r.get("draft") and "judge" not in r)
     s["models_missing_price"] = sorted(missing_prices)  # 비어 있지 않으면 비용이 과소 계산된 것이다
+    # 초안을 한 건도 만들지 않은 실행(--no-compose)에서는 초안에서 나오는 지표를 0이 아니라 빈 값으로 둔다.
+    # 0으로 두면 "재지 않음"이 "위반 0건"으로 읽힌다.
+    if convo and not any(r.get("compose") for r in results):
+        for key in DRAFT_METRICS:
+            s[key] = None
     return s
 
 
