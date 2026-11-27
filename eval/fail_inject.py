@@ -88,7 +88,8 @@ def run_scenario(kind: str, mode: str, case: dict, args) -> dict:
         st, init, _ = ev.http("POST", f"{ai}/chat/init",
                               {"text": case["narrative"], "offense": case["offense_selected"], "known_pii": known})
         if st != 200 or not (init or {}).get("session_id"):
-            out["steps"].append({"step": "init", "status": st, "signal": True})
+            # 대화를 시작하지 못했다. 주입한 호출을 검사하지 못했으므로 드러남으로 세지 않는다.
+            out["steps"].append({"step": "init", "status": st, "signal": False, "unmeasured": True})
             return out
         sid = init["session_id"]
         out["steps"].append(rag_step(wait_rag(ai, sid, args.rag_timeout)))
