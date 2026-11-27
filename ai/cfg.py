@@ -7,7 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-REASONING_EFFORTS = ("minimal", "low", "medium", "high")
+# 모델 세대마다 받는 값이 다르다. gpt-5 계열은 minimal~high, gpt-6 계열은 none·low~max다 (minimal 없음).
+# 여기서는 오타만 막는다. 모델이 받지 않는 값을 주면 호출이 오류로 올라온다.
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
 def _reasoning_effort(name: str, default: str) -> str:
