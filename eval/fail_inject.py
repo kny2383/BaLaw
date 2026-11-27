@@ -165,10 +165,15 @@ def main() -> int:
 
     started = time.time()
     scenarios = []
+    out_dir = ev.ROOT / "runs" / args.run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
     for kind in args.kinds:
         for mode in args.modes:
             s = run_scenario(kind, mode, case, args)
             scenarios.append(s)
+            # 조합이 끝날 때마다 저장한다. 중간에 멈춰도 그때까지의 응답이 남는다 (판정과 비용은 끝에서 계산한다).
+            (out_dir / "fail_inject.partial.json").write_text(
+                json.dumps({"scenarios": scenarios}, ensure_ascii=False, indent=1), encoding="utf-8")
             print(f"[{args.run_id}] {kind}/{mode} 끝", flush=True)
 
     calls = ev.load_calls(args.run_id, started)
@@ -189,8 +194,6 @@ def main() -> int:
         "cost_usd": round(cost, 4), "models_missing_price": sorted(missing),
         "wall_min": round((time.time() - started) / 60, 1),
     }
-    out_dir = ev.ROOT / "runs" / args.run_id
-    out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "fail_inject.json").write_text(
         json.dumps({"summary": summary, "scenarios": scenarios}, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=1))

@@ -27,7 +27,7 @@ def main() -> int:
     out_dir = ev.ROOT / "runs" / args.run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     ev.use_ai(args.ai_url)
-    ev.proxy_control(args.proxy_url, {"run_id": args.run_id, "case_id": "", "fail_rate": 0})
+    ev.proxy_control(args.proxy_url, {"run_id": args.run_id, "case_id": "", "fail_rate": 0, "fail_contains": ""})
     rows, failed = [], 0
     try:
         for case in cases:
