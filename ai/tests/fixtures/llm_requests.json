@@ -10,7 +10,8 @@
     "role": "user"
    }
   ],
-  "model": "gpt-5-mini"
+  "model": "gpt-5-mini",
+  "stream": false
  },
  "extract": {
   "messages": [
@@ -690,7 +691,8 @@
     "role": "user"
    }
   ],
-  "model": "gpt-5-mini"
+  "model": "gpt-5-mini",
+  "stream": false
  },
  "rag_summary": {
   "messages": [
@@ -703,7 +705,8 @@
     "role": "user"
    }
   ],
-  "model": "gpt-5-mini"
+  "model": "gpt-5-mini",
+  "stream": false
  },
  "rewrite": {
   "messages": [
@@ -716,7 +719,8 @@
     "role": "user"
    }
   ],
-  "model": "gpt-5-mini"
+  "model": "gpt-5-mini",
+  "stream": false
  },
  "verify": {
   "messages": [
