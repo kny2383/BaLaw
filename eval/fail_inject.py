@@ -68,7 +68,7 @@ def rag_step(rag: dict) -> dict:
 
 def compose_step(name: str, status: int, body: dict | None) -> dict:
     review = ((body or {}).get("verification") or {}).get("status")
-    draft = (body or {}).get("criminal_facts") or ""
+    draft = ((body or {}).get("sections") or {}).get("criminal_facts") or ""
     return {"step": name, "status": status, "verification": review, "draft_chars": len(draft), "draft_head": draft[:60],
             "signal": status != 200 or review in FAILED_REVIEW}
 
