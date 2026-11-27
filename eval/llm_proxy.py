@@ -13,6 +13,8 @@ OPENAI_BASE_URL=http://llm-proxy:8080/v1 만 지정해서 쓴다.
     fail_mode    "http"    : fail_status 상태 코드로 오류 응답
                  "garbage" : 200 응답이지만 내용이 JSON이 아닌 문장
     fail_status  http 모드의 상태 코드 (기본 500)
+    fail_contains  이 글이 메시지에 들어 있는 호출에만 주입한다. 비우면 모든 채팅 호출이 대상이다.
+                 호출 종류 하나만 실패시킬 때 쓴다 (예: 초안 작성 호출에만 있는 문구).
     seed         실패 주입 난수 시드
 
 표준 라이브러리만 사용한다.
@@ -35,7 +37,8 @@ TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "300"))
 FORWARD_HEADERS = {"authorization", "content-type", "openai-organization", "openai-project", "openai-beta"}
 
 _lock = threading.Lock()
-_control = {"run_id": "", "case_id": "", "fail_rate": 0.0, "fail_mode": "http", "fail_status": 500, "seed": None}
+_control = {"run_id": "", "case_id": "", "fail_rate": 0.0, "fail_mode": "http", "fail_status": 500, "seed": None,
+            "fail_contains": ""}
 _rng = random.Random()
 
 
@@ -59,12 +62,21 @@ def _usage(body: dict) -> dict:
     }
 
 
-def _should_inject(path: str):
+def _message_text(req_json) -> str:
+    """요청의 메시지 글을 이어 붙인다. 주입 대상을 고를 때만 쓴다."""
+    messages = req_json.get("messages") if isinstance(req_json, dict) else None
+    return "\n".join(str(m.get("content", "")) for m in messages or [] if isinstance(m, dict))
+
+
+def _should_inject(path: str, req_json=None):
     with _lock:
         rate = float(_control.get("fail_rate") or 0)
         mode = _control.get("fail_mode", "http")
         status = int(_control.get("fail_status") or 500)
-        hit = rate > 0 and path.endswith("/chat/completions") and _rng.random() < rate
+        needle = str(_control.get("fail_contains") or "")
+        hit = (rate > 0 and path.endswith("/chat/completions")
+               and (not needle or needle in _message_text(req_json))
+               and _rng.random() < rate)
     return (mode, status) if hit else None
 
 
@@ -116,7 +128,7 @@ class Handler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 return self._send(400, b'{"error":"invalid json"}')
             with _lock:
-                for k in ("run_id", "case_id", "fail_rate", "fail_mode", "fail_status", "seed"):
+                for k in ("run_id", "case_id", "fail_rate", "fail_mode", "fail_status", "seed", "fail_contains"):
                     if k in update:
                         _control[k] = update[k]
                 if "seed" in update and update["seed"] is not None:
@@ -140,7 +152,7 @@ class Handler(BaseHTTPRequestHandler):
             "request": req_json,
         }
 
-        injected = _should_inject(self.path)
+        injected = _should_inject(self.path, req_json)
         if injected:
             mode, status = injected
             if mode == "garbage":
