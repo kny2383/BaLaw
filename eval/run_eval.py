@@ -43,6 +43,8 @@ from judge import JudgeError, judge  # noqa: E402
 KICKOFF = "위 사건 개요를 기반으로, 이어서 질문을 해 주세요."  # web ChatWindowSection.tsx와 같은 문장
 DONE_PREFIX = "필수 정보가 충족"
 UNKNOWN_ANSWER = "잘 모르겠어요."
+# 엉뚱한 답. 모의 사용자가 질문과 상관없는 말을 할 때 쓴다 (--stray-every). 모른다는 뜻이 아니어야 한다.
+STRAY_ANSWER = "그때 너무 당황해서 경황이 없었어요."
 ASSERTION_RE = re.compile(r"(성립한다|성립합니다|성립된다|성립됩니다|성립함|명백한 범죄|유죄)")
 
 # 판정 기준 판본. 바꾸면 이전 판본의 M1·M8과 비교할 수 없다.
@@ -272,7 +274,13 @@ def judge_case(r: dict, judge_cfg: dict) -> None:
         r["errors"].append(f"판정 실패: {e}")
 
 
-def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: float, compose: bool = True) -> dict:
+def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: float, compose: bool = True,
+             stray_every: int = 0) -> dict:
+    """사례 하나를 모의 사용자로 진행한다.
+
+    stray_every가 N이면, 정답에 있는 항목을 처음 묻는 질문 N번마다 한 번은 엉뚱한 답을 한다. 서비스가 그 항목을
+    다시 물으면 그때 정답을 준다. 사용자가 질문에 맞지 않게 답했을 때 정보를 잃는지 재는 데 쓴다.
+    """
     out = {"id": case["id"], "group": case["group"], "split": case["split"],
            "expected_offense": case["expected_offense"], "errors": [], "turns": []}
     t0 = time.time()
@@ -314,6 +322,9 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
 
     gold = case["slots"]
     answered: set[str] = set()
+    strayed: set[str] = set()      # 엉뚱한 답을 한 항목
+    recovered: set[str] = set()    # 그 뒤 다시 물어서 정답을 준 항목
+    first_asks = 0
     user_inputs = [case["narrative"]]
     prev_asked: dict = {}
     message = KICKOFF
@@ -348,11 +359,24 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
         else:
             parts = []
             for s in newly:
-                if s in gold:
+                if s in gold and s in strayed and s not in answered:
+                    # 엉뚱하게 답했던 항목을 다시 물었다. 되묻기가 아니라 필요한 질문이다. 이번에는 정답을 준다.
                     parts.append(gold[s]["answer"])
-                    if s in answered:
-                        rec.setdefault("reasked", []).append(s)
+                    rec.setdefault("recovered", []).append(s)
+                    recovered.add(s)
                     answered.add(s)
+                elif s in gold and s in answered:
+                    parts.append(gold[s]["answer"])
+                    rec.setdefault("reasked", []).append(s)
+                elif s in gold:
+                    first_asks += 1
+                    if stray_every and first_asks % stray_every == 0:
+                        parts.append(STRAY_ANSWER)
+                        rec.setdefault("stray", []).append(s)
+                        strayed.add(s)
+                    else:
+                        parts.append(gold[s]["answer"])
+                        answered.add(s)
                 else:
                     parts.append(UNKNOWN_ANSWER)
                     rec.setdefault("nice_unknown", []).append(s)
@@ -360,6 +384,7 @@ def run_case(case: dict, ai: str, max_turns: int, judge_cfg: dict, rag_timeout: 
         user_inputs.append(message)
 
     out["complete"] = complete
+    out["stray"] = {"given": sorted(strayed), "recovered": sorted(recovered), "lost": sorted(strayed - recovered)}
     out["questions"] = sum(1 for t in out["turns"] if t.get("reply") and not t.get("complete"))
     out["first_status"] = first_status or {}
 
@@ -509,8 +534,9 @@ def question_breakdown(result: dict, gold: dict) -> dict:
     reasked    이미 물었던 필수 항목을 다시 물었다
     other      정답에 없는 항목을 물었다
     skipped    서술에 없는 필수 항목인데 대화가 끝날 때까지 한 번도 묻지 않았다
+    recovered  모의 사용자가 엉뚱하게 답한 항목을 다시 물었다 (--stray-every로 잴 때만 나온다)
     """
-    out = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0}
+    out = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0, "recovered": 0}
     seen: set = set()
     for turn in result.get("turns") or []:
         if turn.get("complete") or not turn.get("reply"):
@@ -518,6 +544,8 @@ def question_breakdown(result: dict, gold: dict) -> dict:
         for slot in turn.get("asked_slots") or []:
             if slot not in gold:
                 out["other"] += 1
+            elif slot in (turn.get("recovered") or []):
+                out["recovered"] += 1  # 엉뚱한 답 뒤에 다시 물은 것. 필요한 질문이다
             elif slot in seen:
                 out["reasked"] += 1
             elif gold[slot]["in_narrative"]:
@@ -550,7 +578,7 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
             tp += pred and g["in_narrative"]; fp += pred and not g["in_narrative"]; fn += (not pred) and g["in_narrative"]
     s["M2_recall"] = pct(tp, tp + fn); s["M2_precision"] = pct(tp, tp + fp)
     # 질문의 구성. 서술에 없는 필수 항목(물어야 하는 것) 가운데 얼마나 물었고 얼마나 넘어갔는가.
-    asked = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0, "skipped": 0}
+    asked = {"needed": 0, "unneeded": 0, "reasked": 0, "other": 0, "skipped": 0, "recovered": 0}
     # 끝까지 간 대화만 센다. 오류나 턴 상한으로 멈춘 대화에서는 "넘어간 것"과 "아직 못 물은 것"을 가릴 수 없다.
     finished = [r for r in convo if r.get("complete")]
     for r in finished:
@@ -572,6 +600,12 @@ def summarize(results: list[dict], cases: list[dict], calls: list[dict], prices:
     s["completion_rate"] = pct(sum(1 for r in convo if r.get("complete")), len(convo))
     s["M12_reasked_total"] = sum(len(t.get("reasked", [])) for r in convo for t in r["turns"])
     s["M12_reasked_per_case"] = round(s["M12_reasked_total"] / len(convo), 2) if convo else None
+    # 모의 사용자가 엉뚱하게 답한 항목 (--stray-every). 다시 물어 정답을 받았으면 되찾은 것, 끝까지 묻지 않았으면 잃은 것이다.
+    # 끝까지 간 대화만 센다. 재지 않은 실행에서는 given이 0이다.
+    stray = [r.get("stray") or {} for r in finished]
+    s["M12_stray_given"] = sum(len(x.get("given") or []) for x in stray)
+    s["M12_stray_recovered"] = sum(len(x.get("recovered") or []) for x in stray)
+    s["M12_stray_lost"] = sum(len(x.get("lost") or []) for x in stray)
     s["undetected_question_turns"] = sum(1 for r in convo for t in r["turns"] if t.get("mock"))
 
     # M4, M6
@@ -730,6 +764,9 @@ def main() -> int:
     ap.add_argument("--confirm-model", default=os.environ.get("EVAL_CONFIRM_MODEL", "gpt-6.1-terra"),
                     help="서비스가 사용자 확인을 기다릴 때 모의 사용자의 답을 만드는 모델")
     ap.add_argument("--flush-cache", action="store_true", help="실행 전 Redis 판례 요약 캐시를 비운다")
+    ap.add_argument("--stray-every", type=int, default=0,
+                    help="정답에 있는 항목을 처음 묻는 질문 N번마다 한 번은 모의 사용자가 엉뚱한 답을 한다 (0이면 끔). "
+                         "다시 물어 정답을 받는지, 정보를 잃는지 잰다")
     ap.add_argument("--no-compose", action="store_true",
                     help="대화까지만 진행한다. 초안 작성·검증·판정을 하지 않는다 (정보 추출만 비교할 때)")
     args = ap.parse_args()
@@ -771,7 +808,8 @@ def main() -> int:
     results = []
     print(f"[{args.run_id}] 사례 {len(cases)}건, 동시 {args.concurrency}, 판정 {judge_cfg}", flush=True)
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futs = {pool.submit(run_case, c, args.ai_url, args.max_turns, judge_cfg, args.rag_timeout, not args.no_compose): c
+        futs = {pool.submit(run_case, c, args.ai_url, args.max_turns, judge_cfg, args.rag_timeout, not args.no_compose,
+                            args.stray_every): c
                 for c in cases}
         for f in as_completed(futs):
             c = futs[f]
@@ -795,6 +833,7 @@ def main() -> int:
         "cases_lock": cases_lock()[:16], "service_models": ", ".join(m for m in service_models if m),
         "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "judge_version": judge_cfg.get("version", JUDGE_VERSION), "prices_as_of": prices["as_of"],
         "compose": "하지 않음 (--no-compose)" if args.no_compose else "함",
+        "stray_every": args.stray_every,
         "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1), "warmup": warmup,
     }
     (run_dir / "summary.json").write_text(json.dumps({"meta": meta, "summary": summary}, ensure_ascii=False, indent=1), encoding="utf-8")

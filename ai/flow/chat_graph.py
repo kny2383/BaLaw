@@ -57,6 +57,8 @@ def init_session(state: ChatState) -> dict:
         "offense_selected": req["offense_selected"],
         "history": [{"role": "user", "content": req["text"]}],
         "collected": {},
+        "asked": {},
+        "resolved": {},
         "pii": req.get("pii") or {},
     }
 
@@ -77,9 +79,19 @@ def extract(state: ChatState) -> dict:
     history = state["history"] + [{"role": "user", "content": state["request"]["message"]}]
     user_text = _user_window(history, max_chars=EXTRACT_WINDOW_CHARS)
 
-    parsed = extract_all(user_text, offense)
+    # 방금 한 질문이 있으면 그 질문과 이번 답을 짝지어 알려 준다. 사용자의 말만 이어 붙이면 어느 질문의 답인지 알 수 없다.
+    asked = state.get("asked") or None
+    parsed = extract_all(user_text, offense, asked, state["request"]["message"])
+    resolved = _resolve(state.get("resolved") or {}, asked, parsed)
+    _apply_resolved(parsed, resolved)
     elements = enforce_elements(meta, parsed.get("elements", {}), user_text)
     details = enforce_details(parsed.get("details", {}), offense)
+    # 고정한 슬롯으로 필수 항목이 모두 채워진 항목은, 모델이 적은 상태가 "없음"이어도 채워진 것으로 맞춘다.
+    for group, items in (("elements", elements), ("details", details)):
+        for item in resolved.get(group, {}):
+            rec = items.get(item)
+            if rec and not rec.get("_missing_must") and rec.get("status") == "missing":
+                rec["status"] = "satisfied"
 
     # 질문 횟수는 추출 결과가 아니라 대화가 쌓아 온 값이므로 이어받는다.
     old = state.get("collected") or {}
@@ -94,9 +106,46 @@ def extract(state: ChatState) -> dict:
         "offense": offense,
         "history": history,
         "collected": {"elements": elements, "details": details},
+        "resolved": resolved,
         # 이번 발화에서 새로 생긴 표식. 추출이 실패하면 발화와 함께 저장되지 않는다.
         "pii": state["request"].get("pii") or state.get("pii") or {},
     }
+
+
+# 묻고 답을 받은 뒤 고정하는 값. 답했거나(present) 모른다고 한(unknown) 항목은 다음 턴에 다시 판정해도 바꾸지 않는다.
+# 추출은 매 턴 사용자의 말 전체를 다시 판정하므로, 고정하지 않으면 이미 답한 항목이 "없음"으로 돌아가 다시 묻게 된다.
+SETTLED = ("present", "unknown")
+
+
+def _resolve(resolved: dict, asked: dict | None, parsed: dict) -> dict:
+    """방금 물은 슬롯이 이번 답으로 정해졌으면 고정 목록에 더한다. 받은 값은 고치지 않는다."""
+    out = copy.deepcopy(resolved)
+    if asked:
+        value = (((parsed.get(asked["group"]) or {}).get(asked["item"]) or {}).get("slots") or {}).get(asked["slot"])
+        if value in SETTLED:
+            out.setdefault(asked["group"], {}).setdefault(asked["item"], {})[asked["slot"]] = value
+    return out
+
+
+def _apply_resolved(parsed: dict, resolved: dict) -> None:
+    """고정한 슬롯 값을 추출 결과에 덮어쓴다."""
+    for group, items in resolved.items():
+        for item, slots in items.items():
+            rec = (parsed.get(group) or {}).get(item)
+            if rec is not None:
+                rec.setdefault("slots", {}).update(slots)
+
+
+def _newly_asked(before: dict, after: dict, question: str) -> dict:
+    """질문 선택이 질문 횟수를 올린 슬롯을 찾는다. 하나로 정해지지 않으면 빈 dict (짝지어 알려 주지 않는다)."""
+    found = []
+    for group in ("details", "elements"):
+        for item, rec in (after.get(group) or {}).items():
+            old = ((before.get(group) or {}).get(item) or {}).get("_asked_count") or {}
+            for slot, n in (rec.get("_asked_count") or {}).items():
+                if n > old.get(slot, 0):
+                    found.append({"group": group, "item": item, "slot": slot, "question": question})
+    return found[0] if len(found) == 1 else {}
 
 
 def select_question(state: ChatState) -> dict:
@@ -119,6 +168,7 @@ def select_question(state: ChatState) -> dict:
             reply = alt
 
     history.append({"role": "assistant", "content": reply})
+    asked = {} if complete else _newly_asked(state["collected"], collected, reply)
 
     # 위험요소 정규식판별
     caution_msg = classify_need_caution("\n".join(m["content"] for m in history if m["role"] == "user"))
@@ -126,6 +176,7 @@ def select_question(state: ChatState) -> dict:
     return {
         "collected": collected,
         "history": history,
+        "asked": asked,
         "result": {"reply": reply, "complete": complete, "caution": bool(caution_msg)},
     }
 
