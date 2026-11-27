@@ -105,6 +105,23 @@ def test_empty_keyword_is_a_failed_search_not_an_unfiltered_one(client, fake):
     _assert_rag_failed(client, _init(client)["session_id"])
 
 
+@pytest.mark.parametrize("output", ["죄송합니다. 지금은 답변할 수 없습니다.", "이 사건은 사기에 해당합니다", "없는죄목"])
+def test_keyword_that_is_not_in_the_offense_list_is_a_failed_search(client, fake, output):
+    """목록에서 고르라고 한 호출이 거절 문장이나 설명 글을 돌려주면 키워드로 쓰지 않는다 (M10).
+
+    그대로 쓰면 아무 판례도 걸리지 않은 채 '검색 완료'로 보인다.
+    """
+    fake.keyword = output
+    _assert_rag_failed(client, _init(client)["session_id"])
+
+
+@pytest.mark.parametrize("output", ["사기", " 사기\n", '"사기"', "사기."])
+def test_keyword_with_harmless_decoration_is_accepted(client, fake, output):
+    fake.keyword = output
+    body = client.get(f"/chat/rag/{_init(client)['session_id']}").json()
+    assert body["rag_status"] == "ready" and body["rag_keyword"] == "사기"
+
+
 def test_rag_failure_at_search_is_reported(client, monkeypatch):
     import services.rag as rag
 
@@ -277,7 +294,8 @@ def test_confirm_question_restores_identifiers(client, fake, confirm_on):
     assert [c["quote"] for c in body["verification"]["to_confirm"]] == ["김가상에게"]
 
 
-@pytest.mark.parametrize("broken", ["call_fails", "empty_output", "no_text_at_all", "no_criminal_facts"])
+@pytest.mark.parametrize("broken", ["call_fails", "empty_output", "no_text_at_all", "no_criminal_facts",
+                                    "refusal_sentence", "no_accusation_reason"])
 def test_compose_failure_is_an_error_not_an_empty_draft(client, fake, broken):
     """작성 호출이 실패하거나 쓸 수 있는 글이 없으면 빈 초안을 200으로 돌려주지 않는다 (M10)."""
     sid = _init(client)["session_id"]
@@ -286,7 +304,10 @@ def test_compose_failure_is_an_error_not_an_empty_draft(client, fake, broken):
         fake.fail_compose = True
     else:
         fake.compose_text = {"empty_output": "", "no_text_at_all": "   \n  ",
-                             "no_criminal_facts": "=== 고소이유 ===\n○ 수사를 요청합니다.\n"}[broken]
+                             "no_criminal_facts": "=== 고소이유 ===\n○ 수사를 요청합니다.\n",
+                             # 구분 제목이 없는 한 문장은 전체가 범죄사실로 읽힌다. 초안으로 돌려주면 안 된다.
+                             "refusal_sentence": "죄송합니다. 지금은 답변할 수 없습니다.",
+                             "no_accusation_reason": "=== 범죄사실 ===\n○ 고소인은 금원을 송금하였습니다.\n"}[broken]
     r = client.post("/chat/compose", json={"session_id": sid})
     assert r.status_code == 502
     assert "fake failure" not in r.text

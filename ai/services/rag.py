@@ -68,6 +68,7 @@ def load_offense_names(csv_path: str):
 
 MAJOR_OFFENSES = load_offense_names(str(CSV_PATH))
 OFFENSE_LIST_STR = ", ".join(MAJOR_OFFENSES)
+_MAJOR_OFFENSE_SET = set(MAJOR_OFFENSES)
 
 
 # 사건 개요 → 죄목 키워드 
@@ -88,7 +89,12 @@ def predict_crime_keyword(user_query: str) -> str:
     """
 
     # 호출이 실패하거나 출력이 비면 예외가 올라가고, 판례 검색 그래프가 실패 상태로 남긴다.
-    return llm.text("rag_keyword", prompt)
+    keyword = llm.text("rag_keyword", prompt).strip().strip("\"'`.").strip()
+    # 목록에서 고르라고 했으므로 목록에 없는 출력(거절 문장, 설명 글 등)은 키워드가 아니다.
+    # 그대로 쓰면 아무 판례도 걸리지 않은 채 '검색 완료'로 보인다. 실패로 올린다 (지표 M10).
+    if keyword not in _MAJOR_OFFENSE_SET:
+        raise llm.LLMCallError("keyword_not_in_list")
+    return keyword
 
 
 # 벡터 검색 + 죄명 필터
