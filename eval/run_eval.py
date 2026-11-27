@@ -660,7 +660,7 @@ def main() -> int:
         subprocess.run(["docker", "compose", "-f", "compose.yaml", "-f", "compose.eval.yaml", "exec", "-T",
                         "redis", "redis-cli", "FLUSHDB"], cwd=REPO, check=True, capture_output=True)
     # 예열: 재시작 직후 판례 DB 연결을 미리 만들어 둔다. 예열 호출은 별도 실행 이름으로 기록한다.
-    proxy_control(args.proxy_url, {"run_id": f"{args.run_id}-warmup", "case_id": "", "fail_rate": 0})
+    proxy_control(args.proxy_url, {"run_id": f"{args.run_id}-warmup", "case_id": "", "fail_rate": 0, "fail_contains": ""})
     warmup = "init 실패"
     st, w, _ = http("POST", f"{args.ai_url}/chat/init", {"text": "예열용 요청입니다. 중고거래 사기", "offense": "사기"})
     if st == 200 and w:
@@ -676,7 +676,7 @@ def main() -> int:
     if args.flush_cache:  # 예열이 만든 캐시도 비운다
         subprocess.run(["docker", "compose", "-f", "compose.yaml", "-f", "compose.eval.yaml", "exec", "-T",
                         "redis", "redis-cli", "FLUSHDB"], cwd=REPO, check=True, capture_output=True)
-    proxy_control(args.proxy_url, {"run_id": args.run_id, "case_id": "", "fail_rate": 0})
+    proxy_control(args.proxy_url, {"run_id": args.run_id, "case_id": "", "fail_rate": 0, "fail_contains": ""})
 
     run_dir = ROOT / "runs" / args.run_id
     (run_dir / "cases").mkdir(parents=True, exist_ok=True)
