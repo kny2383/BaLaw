@@ -35,11 +35,14 @@ MARKERS = {
     "rewrite": "[근거 없는 표현]",
 }
 FAILED_REVIEW = ("unverified", "rewrite_failed")
+SUMMARY_KEYS = "baro:rag:case-summary:*"  # ai/services/rag.py의 _case_summary_cache_key
 
 
 def flush_cache() -> None:
-    subprocess.run(["docker", "compose", "-f", "compose.yaml", "-f", "compose.eval.yaml", "exec", "-T",
-                    "redis", "redis-cli", "FLUSHDB"], cwd=ev.REPO, check=True, capture_output=True)
+    """판례 요약 캐시만 지운다. 같은 Redis에 다른 것이 있어도 건드리지 않는다."""
+    subprocess.run(["docker", "compose", "-f", "compose.yaml", "-f", "compose.eval.yaml", "exec", "-T", "redis", "sh", "-c",
+                    f"redis-cli --scan --pattern '{SUMMARY_KEYS}' | xargs -r redis-cli del"],
+                   cwd=ev.REPO, check=True, capture_output=True)
 
 
 def wait_rag(ai: str, sid: str, timeout: float) -> dict:
