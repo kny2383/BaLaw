@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6.1-terra}
       RAG_DB_URL: ${RAG_DB_URL:?RAG_DB_URL is required}
       BARO_AI_TOKEN: ${BARO_AI_TOKEN:?BARO_AI_TOKEN is required}
     volumes:
@@ -56,7 +56,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6.1-terra}
       BARO_AI_URL: http://baro-ai:8000
       BARO_AI_TOKEN: ${BARO_AI_TOKEN:?BARO_AI_TOKEN is required}
       CORS_ORIGINS: ${CORS_ORIGINS:-}

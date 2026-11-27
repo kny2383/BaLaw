@@ -61,8 +61,11 @@ def _per_task(prefix: str, defaults: dict) -> dict:
 
 class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_COMPOSE_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5")
-    OPENAI_CHAT_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+    # 기본 모델. 2026-11-27에 gpt-5-mini(2026-12-11 종료)에서 옮겼다. 근거는 결정 0002의 "모델 이전"과
+    # eval/results/service-model-dev10.md, extract-model-dev10.md. OPENAI_MODEL로 한꺼번에, LLM_MODEL_<작업>으로 작업별로 바꾼다.
+    DEFAULT_MODEL: str = "gpt-6.1-terra"
+    OPENAI_COMPOSE_MODEL: str = os.getenv("OPENAI_MODEL", "").strip() or DEFAULT_MODEL
+    OPENAI_CHAT_MODEL: str = os.getenv("OPENAI_MODEL", "").strip() or DEFAULT_MODEL
     # 작업별 모델. LLM_MODEL_<작업>으로 바꾼다 (예: LLM_MODEL_EXTRACT). 기본값은 위의 두 모델로, 이전과 같다.
     LLM_MODELS: dict = _per_task("LLM_MODEL", {
         "extract": OPENAI_CHAT_MODEL, "verify": OPENAI_CHAT_MODEL,
