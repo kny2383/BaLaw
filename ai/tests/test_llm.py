@@ -12,20 +12,17 @@ from tests.snapshot_llm_requests import OFFENSES, collect, versions_of
 FIXTURE = Path(__file__).parent / "fixtures" / "llm_requests.json"
 
 
-def test_requests_are_the_same_as_before_the_call_layer(client, fake):
-    """구조 변경의 기준: 호출 종류 여섯 가지의 요청 본문이 계층을 바꾸기 전에 저장한 것과 같다.
+def test_requests_match_the_stored_ones(client, fake):
+    """호출 종류 여섯 가지의 요청 본문이 저장해 둔 기준 요청과 같다. 프롬프트나 출력 형식을 바꾸면 기준 요청을 다시 만든다.
 
-    하나만 다르다. 예전 SDK 호출은 글로 받는 요청에 stream을 넣지 않았고, 지금은 stream=false를 넣는다.
-    둘 다 "한 번에 받는다"는 같은 뜻이다.
+    기준 요청은 호출 계층을 만들기 전의 코드에서 처음 저장했고(#49), 그때의 요청과 같다는 것으로 구조 변경을 확인했다.
+    그 뒤 글로 받는 요청에 붙는 stream=false까지 담아 다시 저장했다 (뜻은 같다: 한 번에 받는다).
     """
     before = json.loads(FIXTURE.read_text(encoding="utf-8"))
     now = collect(client, fake)
     assert sorted(now) == sorted(before) == sorted(llm.TASKS)
     for task in llm.TASKS:
-        body = dict(now[task])
-        if "stream" not in before[task]:
-            assert body.pop("stream") is False, task
-        assert body == before[task], task
+        assert now[task] == before[task], task
 
 
 def test_every_call_is_recorded_without_content(client, fake):
