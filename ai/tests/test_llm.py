@@ -212,3 +212,11 @@ def test_reasoning_effort_accepts_values_of_both_model_generations(monkeypatch):
     with pytest.raises(ValueError):
         cfg._reasoning_effort("OPENAI_EXTRACT_REASONING_EFFORT", "low")
 
+
+def test_default_model_is_priced():
+    """기본 모델이 단가표에 있어야 호출 기록의 비용이 빈 값이 되지 않는다. 기본 모델을 바꿀 때 단가도 함께 넣는다."""
+    import cfg
+    default = cfg.Settings.DEFAULT_MODEL
+    assert default in llm.PRICES["models"] or default in llm.PRICES["aliases"]
+    assert llm.cost_usd("compose", default, 1000, 0, 500) is not None
+
