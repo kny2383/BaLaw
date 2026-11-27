@@ -23,3 +23,10 @@ def test_cors_origins_parsing():
     assert Settings(**base, CORS_ORIGINS="  ").cors_origins == list(DEFAULT_CORS_ORIGINS)
     assert Settings(**base, CORS_ORIGINS="https://a.example, https://b.example").cors_origins == [
         "https://a.example", "https://b.example"]
+
+
+def test_unauthenticated_test_routes_are_gone(client):
+    """인증 없이 열려 있던 테스트용 주소는 없다."""
+    assert client.get("/api/test/hello").status_code == 404
+    assert client.post("/api/test/echo", params={"text": "x"}).status_code == 404
+
