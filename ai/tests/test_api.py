@@ -255,7 +255,7 @@ def test_compose_asks_the_user_before_rewriting(client, fake, confirm_on):
 
 def test_compose_reports_dates_removed_without_asking(client, fake, confirm_on):
     """날짜만 붙은 표현은 묻지 않고 고친다. 화면이 사용자에게 알릴 수 있게 응답에 그 표현과 표시를 싣는다."""
-    _, body = _compose_waiting(client, fake, [[("피고소인에게", True)]][0])
+    _, body = _compose_waiting(client, fake, [("피고소인에게", True)])
     v = body["verification"]
     assert v["status"] == "rewritten" and "to_confirm" not in v
     assert [(c["quote"], c["date_moved"]) for c in v["removed"]] == [("피고소인에게", True)]
