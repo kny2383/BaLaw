@@ -264,7 +264,12 @@ def claims_to_confirm(review: dict) -> list[dict]:
     날짜가 다른 일에 붙은 표현은 묻지 않고 고친다. "이 일이 사실인가요?"라고 물으면 사용자는 그 일이 있었으니
     맞다고 답하고, 사용자가 말하지 않은 날짜가 그대로 남는다.
     """
-    return [c for c in review["unsupported"] if not c.get("date_moved")][:settings.DRAFT_CONFIRM_MAX]
+    return [review["unsupported"][i] for i in _confirm_indexes(review)]
+
+
+def _confirm_indexes(review: dict) -> list[int]:
+    """물을 표현이 unsupported의 몇 번째인지. 묻지 않은 표현을 자리로 가려낼 때도 쓴다."""
+    return [i for i, c in enumerate(review["unsupported"]) if not c.get("date_moved")][:settings.DRAFT_CONFIRM_MAX]
 
 
 def confirm(state: ChatState) -> dict:
@@ -283,7 +288,8 @@ def confirm(state: ChatState) -> dict:
             break
 
     kept = [c for c, yes in zip(asked, answers) if yes]
-    not_asked = [c for c in review["unsupported"] if not any(c is a for a in asked)]
+    asked_at = set(_confirm_indexes(review))
+    not_asked = [c for i, c in enumerate(review["unsupported"]) if i not in asked_at]
     denied = [c for c, yes in zip(asked, answers) if not yes] + not_asked
     update: dict = {"review": {**review, "status": "flagged" if denied else "confirmed",
                                "unsupported": denied, "confirmed": review["confirmed"] + kept}}
