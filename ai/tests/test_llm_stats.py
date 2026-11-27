@@ -59,10 +59,23 @@ def test_log_lines_are_parsed_and_other_lines_skipped():
     assert "| verify | 1 | 0 |" in llm_stats.table(llm_stats.summarize(got))
 
 
-def test_stats_endpoint_reports_recent_calls_without_content(client, fake):
+def test_stats_endpoint_is_closed_unless_a_token_is_set(client, monkeypatch):
+    from cfg import settings
+    assert settings.LLM_STATS_TOKEN == ""
+    assert client.get("/llm/stats").status_code == 404
+    assert client.get("/llm/stats", headers={"Authorization": "Bearer "}).status_code == 404  # 빈 토큰끼리 맞는 일이 없다
+    monkeypatch.setattr(settings, "LLM_STATS_TOKEN", "stats-secret")
+    assert client.get("/llm/stats").status_code == 404
+    assert client.get("/llm/stats", headers={"Authorization": "Bearer wrong"}).status_code == 404
+    assert client.get("/llm/stats", headers={"Authorization": "Bearer stats-secret"}).status_code == 200
+
+
+def test_stats_endpoint_reports_recent_calls_without_content(client, fake, monkeypatch):
+    from cfg import settings
+    monkeypatch.setattr(settings, "LLM_STATS_TOKEN", "stats-secret")
     llm.RECENT.clear()
     collect(client, fake)
-    body = client.get("/llm/stats").json()
+    body = client.get("/llm/stats", headers={"Authorization": "Bearer stats-secret"}).json()
     assert sorted(body["tasks"]) == sorted(llm.TASKS) and body["window"] == llm.RECENT.maxlen
     assert body["total"]["calls"] == len(llm.RECENT) and body["total"]["failed"] == 0
     assert body["tasks"]["compose"]["prompt_versions"] == [llm.PROMPT_VERSIONS["compose"]]

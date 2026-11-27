@@ -1,6 +1,7 @@
 import copy
+import hmac
 
-from fastapi import BackgroundTasks, HTTPException, Response
+from fastapi import BackgroundTasks, Header, HTTPException, Response
 from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,8 +74,16 @@ def health():
 
 
 @app.get("/llm/stats")
-def llm_call_stats():
-    """최근 LLM 호출을 작업별로 모은 수치. 프롬프트와 응답 내용은 들어 있지 않다."""
+def llm_call_stats(authorization: Optional[str] = Header(default=None)):
+    """최근 LLM 호출을 작업별로 모은 수치. 프롬프트와 응답 내용은 들어 있지 않다.
+
+    기본은 닫혀 있다. LLM_STATS_TOKEN을 설정하고 `Authorization: Bearer <토큰>`으로 불러야 열린다.
+    토큰이 없거나 틀리면 주소가 있는지도 알리지 않는다 (404).
+    """
+    expected = settings.LLM_STATS_TOKEN
+    given = (authorization or "").removeprefix("Bearer ").strip()
+    if not expected or not hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8")):
+        raise HTTPException(status_code=404, detail="Not Found")
     return {"window": llm.RECENT.maxlen, **llm_stats.summarize(llm.recent())}
 
 
