@@ -836,6 +836,7 @@ def main() -> int:
         "judge": f"{judge_cfg['provider']}/{judge_cfg['model']}", "judge_version": judge_cfg.get("version", JUDGE_VERSION), "prices_as_of": prices["as_of"],
         "compose": "하지 않음 (--no-compose)" if args.no_compose else "함",
         "stray_every": args.stray_every,
+        "flush_cache": "비움" if args.flush_cache else "비우지 않음",
         "concurrency": args.concurrency, "wall_min": round((time.time() - started) / 60, 1), "warmup": warmup,
     }
     (run_dir / "summary.json").write_text(json.dumps({"meta": meta, "summary": summary}, ensure_ascii=False, indent=1), encoding="utf-8")
