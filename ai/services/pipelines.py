@@ -396,9 +396,13 @@ def compose_complaint(meta, collected: dict, evidence: List[str]):
     out = llm.text("compose", user, system=COMPOSE_SYSTEM)
     draft = postprocess_complaint(out)
     sections = split_complaint_sections(draft)
-    # 범죄사실이 없는 초안은 쓸 수 없다. 구분 제목이 없는 출력은 위에서 전체가 범죄사실로 들어간다.
+    # 범죄사실이 없는 초안은 쓸 수 없다.
     if not sections.get("criminal_facts", "").strip():
         raise LLMCallError("no_criminal_facts")
+    # 범죄사실과 고소이유를 모두 쓰라고 했다. 구분 제목이 없는 출력은 위에서 전체가 범죄사실로 들어가므로,
+    # 고소이유가 비어 있으면 요청한 형식의 초안이 아니다 (거절 문장, 잘린 출력 등). 초안으로 돌려주지 않는다 (지표 M10).
+    if not sections.get("accusation_reason", "").strip():
+        raise LLMCallError("draft_missing_section")
     return {
         "offense": meta.offense,
         "title": meta.title_ko,
