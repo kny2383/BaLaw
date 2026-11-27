@@ -82,6 +82,7 @@ def test_rag_ready_after_init(client):
     assert 1 <= len(body["rag_cases"]) <= 2
     for case in body["rag_cases"]:
         assert {"case_no", "label", "summary", "result", "similarity"} <= set(case)
+        assert case["summarized"] is True
         assert "사기" in case["label"]
 
 

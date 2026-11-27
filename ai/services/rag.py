@@ -179,8 +179,9 @@ def summarize_cases_for_ui(user_text: str, cases: list[dict]) -> list[dict]:
           {
             "case_no": "...",
             "label": "...",
-            "summary": "사건 요약",
+            "summary": "사건 요약 (요약하지 못했으면 판례 원문의 앞부분)",
             "result": "판결 결과 및 적용 죄목",
+            "summarized": true,   # 요약을 만들었는가
             "similarity": "내 사건과의 공통점"
           },
           ...
@@ -202,6 +203,10 @@ def summarize_cases_for_ui(user_text: str, cases: list[dict]) -> list[dict]:
 
 
 def get_or_create_case_summary(case: dict) -> dict:
+    """판례 한 건의 요약. 만들어 둔 요약이 있으면 그것을 쓴다.
+
+    요약을 만들지 못한 결과는 저장하지 않는다. 저장하면 한 번의 실패가 보관 기간 내내 요약처럼 나온다.
+    """
     case_no = case.get("case_no", "")
     cache_key = _case_summary_cache_key(case_no)
 
@@ -209,18 +214,24 @@ def get_or_create_case_summary(case: dict) -> dict:
     if cached:
         try:
             data = json.loads(cached)
-            print(f"[RAG CACHE] hit version={settings.RAG_CASE_SUMMARY_VERSION} case_no={case_no}")
-            return _normalize_case_summary(case, data)
+            # 예전에는 실패 결과(원문 앞부분과 안내 글)도 저장했다. 그런 항목은 쓰지 않고 다시 만든다.
+            stored_failure = isinstance(data, dict) and "summarized" not in data and data.get("result") == NO_RESULT
+            summary = None if stored_failure else _normalize_case_summary(case, data)
         except Exception as e:
-            print(f"[RAG CACHE] invalid cache version={settings.RAG_CASE_SUMMARY_VERSION} case_no={case_no}: {e}")
+            print(f"[RAG CACHE] invalid cache version={settings.RAG_CASE_SUMMARY_VERSION} case_no={case_no}: {type(e).__name__}")
+            summary = None
+        if summary and summary["summarized"]:
+            print(f"[RAG CACHE] hit version={settings.RAG_CASE_SUMMARY_VERSION} case_no={case_no}")
+            return summary
 
     print(f"[RAG CACHE] miss version={settings.RAG_CASE_SUMMARY_VERSION} case_no={case_no}")
     summary = summarize_single_case(case)
-    cache_set_json(
-        cache_key,
-        json.dumps(summary, ensure_ascii=False),
-        settings.RAG_CASE_CACHE_TTL_SECONDS,
-    )
+    if summary["summarized"]:
+        cache_set_json(
+            cache_key,
+            json.dumps(summary, ensure_ascii=False),
+            settings.RAG_CASE_CACHE_TTL_SECONDS,
+        )
     return summary
 
 
@@ -255,30 +266,43 @@ def summarize_single_case(case: dict) -> dict:
         data = json.loads(llm.text("rag_summary", user_prompt, system=system_prompt))
         return _normalize_case_summary(case, data)
     except Exception as e:
-        # 요약을 만들지 못하면 판례 원문의 앞부분을 보여 준다. 예외 본문은 기록하지 않는다.
+        # 요약을 만들지 못하면 판례 원문의 앞부분을 보여 주고 summarized=False로 알린다. 예외 본문은 기록하지 않는다.
         print(f"[RAG CACHE] summarize failed case_no={case.get('case_no', '')}: {type(e).__name__}")
         return _fallback_case_summary(case)
 
 
-def _normalize_case_summary(fallback: dict, data: dict) -> dict:
+# 판결 결과를 받지 못했을 때 그 자리에 넣는 글.
+NO_RESULT = "(판결 결과는 판례 원문을 참고해야 합니다.)"
+
+
+def _normalize_case_summary(fallback: dict, data) -> dict:
+    """LLM 출력(또는 저장해 둔 요약)을 응답 형식으로 맞춘다. 요약 글이 없으면 실패로 본다."""
+    summary = (data.get("summary") or "").strip() if isinstance(data, dict) else ""
+    result = (data.get("result") or "").strip() if isinstance(data, dict) else ""
+    if not summary:
+        return _fallback_case_summary(fallback)
     return {
         # 사건번호와 죄명은 검색 결과의 값을 쓴다. LLM이 돌려준 값은 쓰지 않는다 (다른 번호를 적을 수 있다).
         "case_no": fallback.get("case_no", ""),
         "label": fallback.get("label", ""),
-        "summary": (data.get("summary") or "").strip()
-        or fallback.get("summary", "")[:200]
-        or fallback.get("facts", "")[:200],
-        "result": (data.get("result") or "").strip()
-        or "(판결 결과는 판례 원문을 참고해야 합니다.)",
+        "summary": summary,
+        "result": result or NO_RESULT,
+        # 화면이 "요약"과 "요약하지 못해 원문 앞부분을 보여 주는 것"을 구분할 수 있게 한다.
+        "summarized": True,
     }
 
 
 def _fallback_case_summary(case: dict) -> dict:
+    """요약을 만들지 못했을 때의 결과. 판례 원문의 앞부분을 넣고 summarized=False로 알린다.
+
+    원문(facts)이 비어 있으면 판례 자료에 들어 있는 요약 글(summary)을 넣는다. 빈 글을 돌려주지 않기 위해서다.
+    """
     return {
         "case_no": case.get("case_no", ""),
         "label": case.get("label", ""),
-        "summary": case.get("facts", "")[:200],
-        "result": "(판결 결과는 판례 원문을 참고해야 합니다.)",
+        "summary": (case.get("facts") or "")[:200] or (case.get("summary") or "")[:200],
+        "result": NO_RESULT,
+        "summarized": False,
     }
 
 
