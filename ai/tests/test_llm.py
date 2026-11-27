@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 import services.llm as llm
 from cfg import settings
-from tests.snapshot_llm_requests import collect
+from tests.snapshot_llm_requests import OFFENSES, collect, versions_of
 
 FIXTURE = Path(__file__).parent / "fixtures" / "llm_requests.json"
 
@@ -69,10 +69,33 @@ def test_failure_logs_carry_the_tag_not_the_session_id(client, fake, capsys):
 
 
 def test_prompt_versions_match_the_stored_requests():
-    """판본은 기준 요청에서 나온다. 프롬프트를 바꿔 기준 요청을 다시 만들면 판본도 함께 바뀌어야 한다."""
-    before = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    assert llm.PROMPT_VERSIONS == {task: llm.prompt_version_of(body) for task, body in before.items()}
+    """판본은 죄목별 기준 요청에서 나온다. 프롬프트를 바꿔 기준 요청을 다시 만들면 판본도 함께 바뀌어야 한다."""
+    stored = [json.loads((FIXTURE.parent / name).read_text(encoding="utf-8")) for name, _, _ in OFFENSES]
+    assert llm.PROMPT_VERSIONS == versions_of(stored)
     assert len(set(llm.PROMPT_VERSIONS.values())) == len(llm.TASKS)
+
+
+def test_requests_of_every_offense_match_the_stored_ones(client, fake):
+    """프롬프트를 따로 가진 죄목마다 지금 코드의 요청이 기준 요청과 같다. 다르면 기준 요청과 판본을 다시 만든다."""
+    for name, offense, text in OFFENSES[1:]:  # 첫 죄목(사기)은 위의 계층 변경 전 기준으로 비교한다
+        stored = json.loads((FIXTURE.parent / name).read_text(encoding="utf-8"))
+        assert collect(client, fake, offense, text) == stored, name
+        assert sorted(stored) == sorted(llm.TASKS), name
+
+
+def test_versions_are_not_made_from_requests_with_a_missing_task():
+    stored = [json.loads((FIXTURE.parent / name).read_text(encoding="utf-8")) for name, _, _ in OFFENSES]
+    without_rewrite = {task: body for task, body in stored[1].items() if task != "rewrite"}
+    with pytest.raises(ValueError, match="rewrite"):
+        versions_of([stored[0], without_rewrite])
+
+
+def test_a_prompt_change_in_any_offense_changes_the_version():
+    fraud = {"messages": [{"role": "user", "content": "사기 규칙"}]}
+    insult = {"messages": [{"role": "user", "content": "모욕 규칙"}]}
+    both = llm.prompt_version_of(fraud, insult)
+    assert both != llm.prompt_version_of(fraud, {"messages": [{"role": "user", "content": "모욕 규칙 2"}]})
+    assert both != llm.prompt_version_of(fraud)
 
 
 def test_prompt_version_follows_the_prompt_not_the_model():

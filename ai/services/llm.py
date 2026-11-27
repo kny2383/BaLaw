@@ -119,13 +119,16 @@ def reset() -> None:
 _ROOT = Path(__file__).resolve().parent.parent
 # 단가표 (100만 토큰당 달러). 평가기도 같은 파일을 읽는다.
 PRICES: dict = json.loads((_ROOT / "prices.json").read_text(encoding="utf-8"))
-# 작업별 프롬프트 판본. 기준 요청(tests/fixtures/llm_requests.json)을 다시 만들 때 함께 만들어진다.
+# 작업별 프롬프트 판본. 죄목별 기준 요청(tests/fixtures/llm_requests*.json)을 다시 만들 때 함께 만들어진다.
 PROMPT_VERSIONS: dict = json.loads((_ROOT / "prompt_versions.json").read_text(encoding="utf-8"))
 
 
-def prompt_version_of(body: dict) -> str:
-    """요청 본문에서 프롬프트 판본을 만든다. 메시지와 출력 형식이 같으면 같은 판본이다 (모델과 추론 강도는 뺀다)."""
-    core = {"messages": body.get("messages"), "response_format": body.get("response_format")}
+def prompt_version_of(*bodies: dict) -> str:
+    """요청 본문들에서 프롬프트 판본을 만든다. 메시지와 출력 형식이 같으면 같은 판본이다 (모델과 추론 강도는 뺀다).
+
+    죄목마다 프롬프트가 다른 작업은 죄목별 요청을 모두 넣는다. 어느 죄목의 문구를 바꿔도 판본이 바뀐다.
+    """
+    core = [{"messages": b.get("messages"), "response_format": b.get("response_format")} for b in bodies]
     return hashlib.sha256(json.dumps(core, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:8]
 
 
